@@ -10,6 +10,10 @@ from PyQt5 import QtCore
 import sys
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QComboBox, QSlider, QWidget, QHBoxLayout
 from PyQt5 import QtCore
+import numpy as np
+from PyQt5.QtGui import QPixmap, QImage
+from PIL import Image, ImageQt
+
 
 
 
@@ -21,6 +25,16 @@ class UI(QMainWindow):
 
         self.dark_theme()
         self.image_labels = []
+        self.image_list = {}
+        self.image_id = 0
+        self.freq_component_combobox = []
+        self.freq_component_label =[]
+        self.image_phases = [[0],[0],[0],[0]]
+        self.image_magnitudes = [[0],[0],[0],[0]]
+
+
+
+
         main_layout = QHBoxLayout()
 
         left_layout = QVBoxLayout()
@@ -34,15 +48,16 @@ class UI(QMainWindow):
             image_label.setFixedSize(400, 250) # 400 is the width, 250 is th eheight
             image_label.setStyleSheet("border: 1px solid #444; background-color: #333; color: white;")
             image_label.setAlignment(QtCore.Qt.AlignCenter)
-    
-            image_label.mouseDoubleClickEvent = lambda event, lbl=image_label: self.load_image(lbl)
+
+            image_label.mouseDoubleClickEvent = lambda event, idx=i: self.load_image(idx)
+            image_label.setScaledContents(True)
 
             # Add label to the list
             self.image_labels.append(image_label)
-            
+
             # Create a combo box
             combo_box = QComboBox()
-            combo_box.addItems(["Choose FT Component", "FT Real Components", "FT Imaginary Components"])
+            combo_box.addItems(["Choose FT Component",'FT Magnitude','FT Phase',"FT Real Components", "FT Imaginary Components"])
             combo_box.setStyleSheet("""
                 QComboBox {
                     background-color: #8B0047; 
@@ -63,12 +78,15 @@ class UI(QMainWindow):
                     border: 1px solid #555; /* Border for the dropdown */
                 }
             """)
-
+            self.freq_component_combobox.append(combo_box)
+            combo_box.currentIndexChanged.connect(
+                lambda index, combo=combo_box, idx=i: self.show_freq_components(idx, combo.currentText())
+            )
 
             section1_layout.addWidget(original_image_label, 0, i)
             section1_layout.addWidget(image_label, 1, i)
             section1_layout.addWidget(combo_box, 2, i)
-        
+
         # second_label = self.image_labels[1]
         # second_label.setText("new Text for Second Label")
         # second_label.setStyleSheet("border: 2px solid red; background-color: #555; color: yellow;")
@@ -81,6 +99,9 @@ class UI(QMainWindow):
             ft_label.setStyleSheet("border: 1px solid #444; background-color: #333; color: white;")
             ft_label.setAlignment(QtCore.Qt.AlignCenter)
             section2_layout.addWidget(ft_label, 0, i)
+            self.freq_component_label.append(ft_label)
+            ft_label.setScaledContents(True)
+
 
         # section 3: output images
         section3_layout = QHBoxLayout()
@@ -252,13 +273,131 @@ class UI(QMainWindow):
         dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
         self.setPalette(dark_palette)
         self.setStyleSheet("background-color: #282828; color: white; font-family: Arial; font-size: 14px;")
-    
-    def load_image(self, label):
+
+    def load_image(self, label_index):
         file_dialog = QFileDialog()
         file_path, _ = file_dialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg *.jpeg *.bmp)")
         if file_path:
-            pixmap = QPixmap(file_path)
-            label.setPixmap(pixmap.scaled(label.size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+            image = Image.open(file_path).convert('L')
+            image_array = np.array(image)
+            self.image_id = label_index
+            self.image_list[self.image_id] = image_array
+            height, width = image_array.shape
+            qimage = QImage( image_array.data , width, height, QImage.Format_Grayscale8)
+            pixmap = QPixmap.fromImage(qimage)
+
+            if self.image_id == 0:
+                self.image_labels[0].setPixmap(pixmap.scaled(self.image_labels[0].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+            elif self.image_id == 1:
+                self.image_labels[1].setPixmap(pixmap.scaled(self.image_labels[1].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+            elif self.image_id == 2:
+                self.image_labels[2].setPixmap(pixmap.scaled(self.image_labels[2].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+            else:
+                self.image_labels[3].setPixmap(pixmap.scaled(self.image_labels[3].size(), QtCore.Qt.KeepAspectRatio,
+                                                             QtCore.Qt.SmoothTransformation))
+
+    def show_freq_components(self,index,value):
+        print(self.image_phases)
+        if value == 'FT Magnitude':
+            if index == 0:
+                self.compute_magnitude(self.image_list[0], index)
+            if index == 1:
+                self.compute_magnitude(self.image_list[1],index)
+            if index == 2:
+                self.compute_magnitude(self.image_list[2], index)
+            if index == 3:
+                self.compute_magnitude(self.image_list[3], index)
+        elif value == 'FT Phase':
+            if index == 0:
+                self.compute_phase_components(self.image_list[0], index)
+            if index == 1:
+                self.compute_phase_components(self.image_list[1], index)
+            if index == 2:
+                self.compute_phase_components(self.image_list[2], index)
+            if index == 3:
+                self.compute_phase_components(self.image_list[3], index)
+        elif value == "FT Real Components":
+            if index == 0:
+                self.compute_real_part(self.image_list[0], index)
+            if index == 1:
+                self.compute_real_part(self.image_list[1], index)
+            if index == 2:
+                self.compute_real_part(self.image_list[2], index)
+            if index == 3:
+                self.compute_real_part(self.image_list[3], index)
+        elif value == "FT Imaginary Components":
+            if index == 0:
+                self.compute_imaginary_part(self.image_list[0], index)
+            if index == 1:
+                self.compute_imaginary_part(self.image_list[1], index)
+            if index == 2:
+                self.compute_imaginary_part(self.image_list[2], index)
+            if index == 3:
+                self.compute_imaginary_part(self.image_list[3], index)
+        else:
+            pass
+
+    def compute_magnitude(self, image_data, index):
+        image_fourier_transform = np.fft.fft2(image_data)
+        f_shift = np.fft.fftshift(image_fourier_transform)
+        magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)
+        print(index)
+        self.image_magnitudes[index] = magnitude_spectrum
+        magnitude_spectrum = np.uint8(np.clip(magnitude_spectrum, 0, 255))
+        height, width = magnitude_spectrum.shape
+        qimage = QImage(magnitude_spectrum.data, width, height, QImage.Format_Grayscale8)
+        pixmap = QPixmap.fromImage(qimage)
+        self.freq_component_label[index].setPixmap(pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
+                                                     QtCore.Qt.SmoothTransformation))
+    def compute_phase_components(self,image_data,index):
+        image_fourier_transform = np.fft.fft2(image_data)
+        f_shift = np.fft.fftshift(image_fourier_transform)
+        phase_spectrum = np.angle(f_shift)
+        self.image_phases[index] = phase_spectrum
+        phase_spectrum_normalized = np.uint8(np.clip(((phase_spectrum + np.pi) / (2 * np.pi)) * 255, 0, 255))
+        height, width = phase_spectrum_normalized.shape
+        qimage = QImage(phase_spectrum_normalized.data, width, height, QImage.Format_Grayscale8)
+        pixmap = QPixmap.fromImage(qimage)
+        self.freq_component_label[index].setPixmap(
+            pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
+                          QtCore.Qt.SmoothTransformation))
+
+    def compute_real_part(self, image_data, index):
+        # Compute the Fourier Transform
+        image_fourier_transform = np.fft.fft2(image_data)
+        # Extract the real part of the Fourier Transform
+        real_part = np.real(image_fourier_transform)
+        # Normalize the real part to the range [0, 255] for display
+        real_part_normalized = np.uint8(np.clip(real_part, 0, 255))
+        height, width = real_part_normalized.shape
+        qimage = QImage(real_part_normalized.data, width, height, QImage.Format_Grayscale8)
+        # Convert QImage to QPixmap and set it on the label
+        pixmap = QPixmap.fromImage(qimage)
+        self.freq_component_label[index].setPixmap(
+            pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
+                          QtCore.Qt.SmoothTransformation))
+
+    def compute_imaginary_part(self, image_data, index):
+        # Compute the Fourier Transform
+        image_fourier_transform = np.fft.fft2(image_data)
+
+        # Extract the imaginary part of the Fourier Transform
+        imaginary_part = np.imag(image_fourier_transform)
+
+        # Normalize the imaginary part to the range [0, 255] for display
+        imaginary_part_normalized = np.uint8(np.clip(imaginary_part, 0, 255))
+
+        # Get the image dimensions
+        height, width = imaginary_part_normalized.shape
+
+        # Create a QImage from the normalized imaginary part (grayscale)
+        qimage = QImage(imaginary_part_normalized.data, width, height, QImage.Format_Grayscale8)
+
+        # Convert QImage to QPixmap and set it on the label
+        pixmap = QPixmap.fromImage(qimage)
+        self.freq_component_label[index].setPixmap(
+            pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
+                          QtCore.Qt.SmoothTransformation))
 
 
 app = QtWidgets.QApplication([])
