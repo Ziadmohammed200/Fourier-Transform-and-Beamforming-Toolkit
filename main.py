@@ -90,7 +90,7 @@ class UI(QMainWindow):
         self.weighted_magnitude = [np.zeros((1, 1))] * 4
         self.weighted_phase = [np.zeros((1, 1))] * 4
         self.selected_port_indx = 0
-
+        self.start = 1
         self.output_label = []
         self.sliders = []
         self.mixer_region=[]
@@ -98,6 +98,8 @@ class UI(QMainWindow):
         self.selected_mixer_region = "Inner"
         self.output_combo = []
         self.output_freq_components = "Phase"
+        self.combined_magnitude = None
+        self.combined_phase = None
         self.start_point = None
         self.end_point = None
         self.selection_rect = None
@@ -208,8 +210,8 @@ class UI(QMainWindow):
             # slider
             slider = QSlider(QtCore.Qt.Horizontal)
             slider.setRange(0, 100)
-            slider.setValue(50)
-            slider_value_label = QLabel("50%")
+            slider.setValue(0)
+            slider_value_label = QLabel("0%")
             slider_value_label.setStyleSheet("color: #ffcce6; font-size: 12px; font-weight: bold;")
             slider.valueChanged.connect(lambda value, lbl=slider_value_label: lbl.setText(f"{value}%"))
             slider.setStyleSheet("""
@@ -473,20 +475,20 @@ class UI(QMainWindow):
         self.output_label[index].clear()
 
         # Ensure we have the same number of magnitudes and phases
-        # print(self.weighted_magnitude[0])
-        # print(self.weighted_magnitude[1])
         num_images = len(self.image_magnitudes)
-        combined_magnitude = np.zeros_like(self.weighted_magnitude[0])
-        combined_phase = np.zeros_like(self.weighted_phase[0])
+        self.combined_magnitude = np.zeros_like(self.weighted_magnitude[0])
+        self.combined_phase = np.zeros_like(self.weighted_phase[0])
 
         # Combine all images' magnitudes and phases
         for i in range(num_images):
-            combined_magnitude += self.weighted_magnitude[i]
-            combined_phase += self.weighted_phase[i]
+            self.combined_magnitude += self.weighted_magnitude[i]
+            self.combined_phase += self.weighted_phase[i]
+
+        # Normalize the combined magnitude
+        combined_magnitude = np.clip(self.combined_magnitude, 0, np.max(self.combined_magnitude))
 
         # Reconstruct the complex Fourier spectrum
-        combined_magnitude = np.clip(combined_magnitude, 0, np.max(combined_magnitude))
-        complex_spectrum = combined_magnitude * np.exp(1j * combined_phase)
+        complex_spectrum = combined_magnitude * np.exp(1j * self.combined_phase)
 
         # Compute the inverse Fourier transform
         reconstructed_image = np.fft.ifft2(complex_spectrum)
@@ -517,22 +519,31 @@ class UI(QMainWindow):
                 return
 
             start_x, start_y, width, height = rect.x(), rect.y(), rect.width(), rect.height()
-            value = value / 100
+            value = value / 100  # Normalize slider value between 0 and 1
 
             x_end = min(start_x + width, self.image_magnitudes[index].shape[1])
             y_end = min(start_y + height, self.image_magnitudes[index].shape[0])
 
             if self.output_freq_components == "Magnitude":
                 selected_magnitude = self.image_magnitudes[index][start_y:y_end, start_x:x_end].copy()
+                selected_phase = self.image_phases[index][start_y:y_end, start_x:x_end].copy()
+
+                # Scale the magnitude, but leave the phase unchanged
                 self.weighted_magnitude[index] = selected_magnitude * value
+                self.weighted_phase[index] = selected_phase
             else:
                 selected_phase = self.image_phases[index][start_y:y_end, start_x:x_end].copy()
+                selected_magnitude = self.image_magnitudes[index][start_y:y_end, start_x:x_end].copy()
+
+                # Scale the phase, but leave the magnitude unchanged
                 self.weighted_phase[index] = selected_phase * value
+                self.weighted_magnitude[index] = selected_magnitude
 
             self.reconstruct_and_display_in_label(self.selected_port_indx)
 
     def change_slider(self,index,value):
         self.update_component(index, value)
+        self.start = 0
 
 
 app = QtWidgets.QApplication([])
