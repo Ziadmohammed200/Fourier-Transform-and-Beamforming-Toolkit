@@ -333,7 +333,7 @@ class UI(QMainWindow):
 
         
         for i in range(4):  
-            combo_items = ["Phase", "Magnitude"]
+            combo_items = ["Phase", "Magnitude","Real part","imaginary part"]
             counter = i
             bordered_widget = create_widget(f"Component {i + 1}", combo_items,counter)
             right_layout.addWidget(bordered_widget)
@@ -551,6 +551,21 @@ class UI(QMainWindow):
                           QtCore.Qt.SmoothTransformation))
         self.output_label[index].setAlignment(Qt.AlignCenter)
 
+
+
+    def compute_fft(self,image):
+        """Compute the FFT of an image and return magnitude and phase."""
+        f = np.fft.fft2(image)
+        f_shift = np.fft.fftshift(f)
+        magnitude = np.abs(f_shift)
+        phase = np.angle(f_shift)
+        return magnitude, phase
+
+    def combine_fft(self,magnitude, phase):
+        """Combine magnitude and phase into a single FFT."""
+        combined = magnitude * np.exp(1j * phase)
+        return np.fft.ifftshift(combined)
+
     def update_component(self, index, value):
         if self.selected_port == "Port 1":
             rect = self.freq_component_label[index].selection_rect
@@ -580,9 +595,87 @@ class UI(QMainWindow):
 
             self.reconstruct_and_display_in_label(self.selected_port_indx)
 
+    import numpy as np
+
+    def mix_images(self, magnitude_list, phase_list, weights, modes):
+        # Ensure lists are the same length
+        # if len(magnitude_list) != len(phase_list) or len(magnitude_list) != len(weights):
+        #     raise ValueError("Mismatch in lengths of magnitudes, phases, and weights.")
+
+        # Initialize weighted magnitude and phase
+        combined_magnitude = np.zeros_like(magnitude_list[0])
+        combined_phase = np.zeros_like(phase_list[0])
+
+        # Iterate through each image and mix based on weights and modes
+        for i in range(len(weights)):
+            weight = weights[i]
+            mode = modes[i]
+
+            if weight > 0:  # Only process if weight is non-zero
+                if mode == "Magnitude":
+                    # Add weighted magnitude
+                    combined_magnitude += weight * magnitude_list[i]
+                elif mode == "Phase":
+                    # Add weighted phase
+                    combined_phase += weight * phase_list[i]
+                else:
+                    raise ValueError(f"Invalid mode: {mode}. Use 'magnitude' or 'phase'.")
+
+        # Normalize combined magnitude and phase
+        total_weight = sum(weights)
+        if total_weight > 0:
+            combined_magnitude /= total_weight
+            combined_phase /= total_weight
+
+        # Reconstruct the mixed image using inverse FFT
+        mixed_fft = combined_magnitude * np.exp(1j * combined_phase)
+        mixed_image = np.abs(np.fft.ifft2(mixed_fft))
+
+        return mixed_image
+
+    def update_output(self):
+        # Retrieve weights (slider values) and modes (comboBox selections)
+        weights = [slider.value() / 100 for slider in self.sliders]  # Normalize slider values to [0, 1]
+        modes = [comboBox.currentText() for comboBox in self.output_combo]
+
+        # Mix images with the dynamically fetched weights and modes
+        mixed_image = self.mix_images(self.image_magnitudes, self.image_phases, weights, modes)
+
+        height, width = mixed_image.shape
+        q_image = QImage(mixed_image.tobytes(), width, height, width, QImage.Format_Grayscale8)
+
+        # Display in QLabel
+        pixmap = QPixmap.fromImage(q_image)
+        self.output_label[0].setPixmap(
+            pixmap.scaled(self.output_label[0].size(), QtCore.Qt.KeepAspectRatio,
+                          QtCore.Qt.SmoothTransformation))
+        self.output_label[0].setAlignment(Qt.AlignCenter)
+
+
+
+        # Display the mixed image
+        self.display_image(mixed_image)
+
+    def display_image(self, image):
+        # Normalize the image
+        normalized_image = self.normalize_image(image)
+
+        # Convert numpy.ndarray to QImage
+        height, width = normalized_image.shape
+        # Ensure the image has the correct shape (grayscale image)
+        q_image = QImage(normalized_image.data, width, height, width, QImage.Format_Grayscale8)
+
+        # Convert QImage to QPixmap and set it to the QLabel
+        pixmap = QPixmap.fromImage(q_image)
+        self.output_label[0].setPixmap(pixmap)
+
+    def normalize_image(self,image):
+        # Normalize the image to range [0, 255]
+        normalized = 255 * (image - np.min(image)) / (np.max(image) - np.min(image))
+        return normalized.astype(np.uint8)
+
     def change_slider(self,index,value):
-        self.update_component(index, value)
-        self.start = 0
+        self.update_output()
 
 
 app = QtWidgets.QApplication([])
