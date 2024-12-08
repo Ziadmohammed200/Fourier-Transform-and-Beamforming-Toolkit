@@ -87,6 +87,8 @@ class UI(QMainWindow):
         self.freq_component_label =[]
         self.image_phases = [None] * 4
         self.image_magnitudes = [None] * 4
+        self.image_real_part = [None] * 4
+        self.image_imaginary_part = [None] * 4
         self.weighted_magnitude = [np.zeros((1, 1))] * 4
         self.weighted_phase = [np.zeros((1, 1))] * 4
         self.selected_port_indx = 0
@@ -97,7 +99,10 @@ class UI(QMainWindow):
         self.selected_port='Port 1'
         self.selected_mixer_region = "Inner"
         self.output_combo = []
-        self.output_freq_components = "Phase"
+        self.output_freq_components1 = "Phase"
+        self.output_freq_components2 = "Phase"
+        self.output_freq_components3 = "Phase"
+        self.output_freq_components4 = "Phase"
         self.combined_magnitude = None
         self.combined_phase = None
         self.start_point = None
@@ -379,40 +384,69 @@ class UI(QMainWindow):
 
             if self.image_id == 0:
                 self.image_labels[0].setPixmap(pixmap.scaled(self.image_labels[0].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+                magnitude, phase = self.compute_magnitude_and_phase(image_array)
+                real,imaginary=self.compute_real_and_imaginary(image_array)
+                self.image_magnitudes.insert(0,magnitude)
+                self.image_phases.insert(0,phase)
+                self.image_real_part.insert(0,real)
+                self.image_imaginary_part.insert(0,imaginary)
             elif self.image_id == 1:
                 self.image_labels[1].setPixmap(pixmap.scaled(self.image_labels[1].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+                magnitude,phase = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                real,imaginary=self.compute_real_and_imaginary(image_array)
+                self.image_magnitudes.insert(1,magnitude)
+                self.image_phases.insert(1,phase)
+                self.image_real_part.insert(1, real)
+                self.image_imaginary_part.insert(1, imaginary)
             elif self.image_id == 2:
                 self.image_labels[2].setPixmap(pixmap.scaled(self.image_labels[2].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
+                magnitude,phase = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                real,imaginary=self.compute_real_and_imaginary(image_array)
+                self.image_magnitudes.insert(2,magnitude)
+                self.image_phases.insert(2,phase)
+                self.image_real_part.insert(2, real)
+                self.image_imaginary_part.insert(2, imaginary)
             else:
                 self.image_labels[3].setPixmap(pixmap.scaled(self.image_labels[3].size(), QtCore.Qt.KeepAspectRatio,
                                                              QtCore.Qt.SmoothTransformation))
+                magnitude,phase = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                real,imaginary=self.compute_real_and_imaginary(image_array)
+                self.image_magnitudes.insert(3,magnitude)
+                self.image_phases.insert(3,phase)
+                self.image_real_part.insert(3, real)
+                self.image_imaginary_part.insert(3, imaginary)
 
     def show_freq_components(self, index, value):
-        computation_methods = {
-            'FT Magnitude': self.compute_magnitude,
-            'FT Phase': self.compute_phase_components,
-            'FT Real Components': self.compute_real_part,
-            'FT Imaginary Components': self.compute_imaginary_part
-        }
-        if value in computation_methods and index in range(4):
-            computation_methods[value](self.image_list[index], index)
-
-    def compute_magnitude(self, image_data, index):
+        print(index, value)
+        if value == 'FT Magnitude':
+            print('Entered')
+            self.plot_magnitude(self.image_magnitudes[index],index)
+        elif value == "FT Phase":
+            self.plot_phase(self.image_phases[index],index)
+        elif value == "FT Real Components" :
+            print("enter real")
+            self.plot_real(self.image_real_part[index],index)
+        else:
+            print("enter imaginary")
+            self.plot_imaginary(self.image_imaginary_part[index],index)
+    def compute_magnitude_and_phase(self, image_data):
         image_fourier_transform = np.fft.fft2(image_data)
         f_shift = np.fft.fftshift(image_fourier_transform)
         magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)
-        self.image_magnitudes[index] = np.array(magnitude_spectrum)
+        phase_spectrum = np.angle(f_shift)
+        return magnitude_spectrum,phase_spectrum
+
+
+    def plot_magnitude(self, magnitude_spectrum, index):
         magnitude_spectrum = np.uint8(np.clip(magnitude_spectrum, 0, 255))
         height, width = magnitude_spectrum.shape
         qimage = QImage(magnitude_spectrum.data, width, height, QImage.Format_Grayscale8)
         pixmap = QPixmap.fromImage(qimage)
-        self.freq_component_label[index].setPixmap(pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
-                                                     QtCore.Qt.SmoothTransformation))
-    def compute_phase_components(self,image_data,index):
-        image_fourier_transform = np.fft.fft2(image_data)
-        f_shift = np.fft.fftshift(image_fourier_transform)
-        phase_spectrum = np.angle(f_shift)
-        self.image_phases[index] = np.array(phase_spectrum)
+        self.freq_component_label[index].setPixmap(
+            pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
+                          QtCore.Qt.SmoothTransformation))
+
+    def plot_phase(self,phase_spectrum,index):
         phase_spectrum_normalized = np.uint8(np.clip(((phase_spectrum + np.pi) / (2 * np.pi)) * 255, 0, 255))
         height, width = phase_spectrum_normalized.shape
         qimage = QImage(phase_spectrum_normalized.data, width, height, QImage.Format_Grayscale8)
@@ -421,12 +455,17 @@ class UI(QMainWindow):
             pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
                           QtCore.Qt.SmoothTransformation))
 
-    def compute_real_part(self, image_data, index):
+
+    def compute_real_and_imaginary(self, image_data):
         # Compute the Fourier Transform
         image_fourier_transform = np.fft.fft2(image_data)
         # Extract the real part of the Fourier Transform
         real_part = np.real(image_fourier_transform)
-        # Normalize the real part to the range [0, 255] for display
+        imaginary_part = np.imag(image_fourier_transform)
+        return real_part ,imaginary_part
+
+
+    def plot_real(self, real_part, index):
         real_part_normalized = np.uint8(np.clip(real_part, 0, 255))
         height, width = real_part_normalized.shape
         qimage = QImage(real_part_normalized.data, width, height, QImage.Format_Grayscale8)
@@ -436,40 +475,40 @@ class UI(QMainWindow):
             pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
                           QtCore.Qt.SmoothTransformation))
 
-    def compute_imaginary_part(self, image_data, index):
-        # Compute the Fourier Transform
-        image_fourier_transform = np.fft.fft2(image_data)
-
-        # Extract the imaginary part of the Fourier Transform
-        imaginary_part = np.imag(image_fourier_transform)
-
-        # Normalize the imaginary part to the range [0, 255] for display
+    def plot_imaginary(self, imaginary_part, index):
         imaginary_part_normalized = np.uint8(np.clip(imaginary_part, 0, 255))
-
-        # Get the image dimensions
         height, width = imaginary_part_normalized.shape
-
-        # Create a QImage from the normalized imaginary part (grayscale)
         qimage = QImage(imaginary_part_normalized.data, width, height, QImage.Format_Grayscale8)
-
-        # Convert QImage to QPixmap and set it on the label
         pixmap = QPixmap.fromImage(qimage)
         self.freq_component_label[index].setPixmap(
             pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
                           QtCore.Qt.SmoothTransformation))
+
 
     def select_mixer_region(self,index,value):
         self.selected_mixer_region = value
     def select_port(self,index,value):
         self.selected_port = value
         self.selected_port_indx = index
-    def change_output_freq_components(self,index,value):
-        ## index for each output slider and value =0 for phase and =1 for magnitude
-        if value == 1:
-            self.output_freq_components = "Magnitude"
+
+    def change_output_freq_components(self, index, value):
+        # Mapping of index to the attribute names
+        attribute_names = [
+            "output_freq_components1",
+            "output_freq_components2",
+            "output_freq_components3",
+            "output_freq_components4"
+        ]
+
+        # Ensure the index is within the valid range
+        if 0 <= index < len(attribute_names):
+            # Update the corresponding attribute based on value
+            setattr(self, attribute_names[index], "Magnitude" if value == 1 else "Phase")
         else:
-            self.output_freq_components = "Phase"
-        print(index,value)
+            print(f"Invalid index: {index}")
+
+        # Debugging output
+        print(f"Index: {index}, Value: {value}")
 
     def reconstruct_and_display_in_label(self, index):
         self.output_label[index].clear()
@@ -524,7 +563,7 @@ class UI(QMainWindow):
             x_end = min(start_x + width, self.image_magnitudes[index].shape[1])
             y_end = min(start_y + height, self.image_magnitudes[index].shape[0])
 
-            if self.output_freq_components == "Magnitude":
+            if self.output_freq_components1 == "Magnitude":
                 selected_magnitude = self.image_magnitudes[index][start_y:y_end, start_x:x_end].copy()
                 selected_phase = self.image_phases[index][start_y:y_end, start_x:x_end].copy()
 
