@@ -85,10 +85,10 @@ class UI(QMainWindow):
         self.image_id = 0
         self.freq_component_combobox = []
         self.freq_component_label =[]
-        self.image_phases = [None] * 4
-        self.image_magnitudes = [None] * 4
-        self.image_real_part = [None] * 4
-        self.image_imaginary_part = [None] * 4
+        self.image_phases = []
+        self.image_magnitudes = []
+        self.image_real_part = []
+        self.image_imaginary_part = []
         self.weighted_magnitude = [np.zeros((1, 1))] * 4
         self.weighted_phase = [np.zeros((1, 1))] * 4
         self.selected_port_indx = 0
@@ -96,6 +96,7 @@ class UI(QMainWindow):
         self.output_label = []
         self.sliders = []
         self.mixer_region=[]
+        self.f_shift=[]
         self.selected_port='Port 1'
         self.selected_mixer_region = "Inner"
         self.output_combo = []
@@ -350,6 +351,10 @@ class UI(QMainWindow):
         for index, freq_combo in enumerate(self.output_combo):
             freq_combo.currentIndexChanged.connect(lambda value=freq_combo, idx=index: self.change_output_freq_components(idx, value))
 
+        for index, freq_combo in enumerate(self.output_combo):
+            freq_combo.currentIndexChanged.connect(
+                lambda value=freq_combo, idx=index: self.change_slider(idx, value))
+
 
         main_layout.addLayout(left_layout, 4)  
         main_layout.addLayout(right_layout, 1) 
@@ -384,43 +389,49 @@ class UI(QMainWindow):
 
             if self.image_id == 0:
                 self.image_labels[0].setPixmap(pixmap.scaled(self.image_labels[0].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-                magnitude, phase = self.compute_magnitude_and_phase(image_array)
+                magnitude, phase , f_shift = self.compute_magnitude_and_phase(image_array)
                 real,imaginary=self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(0,magnitude)
-                self.image_phases.insert(0,phase)
-                self.image_real_part.insert(0,real)
-                self.image_imaginary_part.insert(0,imaginary)
+                self.image_magnitudes.append(magnitude)
+                self.image_phases.append(phase)
+                self.image_real_part.append(real)
+                self.image_imaginary_part.append(imaginary)
+                self.f_shift.append(f_shift)
             elif self.image_id == 1:
                 self.image_labels[1].setPixmap(pixmap.scaled(self.image_labels[1].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-                magnitude,phase = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                magnitude,phase,f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
                 real,imaginary=self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(1,magnitude)
-                self.image_phases.insert(1,phase)
-                self.image_real_part.insert(1, real)
-                self.image_imaginary_part.insert(1, imaginary)
+                self.image_magnitudes.append(magnitude)
+                self.image_phases.append(phase)
+                self.image_real_part.append( real)
+                self.image_imaginary_part.append( imaginary)
+                self.f_shift.append(f_shift)
+
             elif self.image_id == 2:
                 self.image_labels[2].setPixmap(pixmap.scaled(self.image_labels[2].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-                magnitude,phase = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                magnitude,phase,f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
                 real,imaginary=self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(2,magnitude)
-                self.image_phases.insert(2,phase)
-                self.image_real_part.insert(2, real)
-                self.image_imaginary_part.insert(2, imaginary)
+                self.image_magnitudes.append(magnitude)
+                self.image_phases.append(phase)
+                self.image_real_part.append(real)
+                self.image_imaginary_part.append(imaginary)
+                self.f_shift.append(f_shift)
+
             else:
                 self.image_labels[3].setPixmap(pixmap.scaled(self.image_labels[3].size(), QtCore.Qt.KeepAspectRatio,
                                                              QtCore.Qt.SmoothTransformation))
-                magnitude,phase = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                magnitude,phase,f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
                 real,imaginary=self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(3,magnitude)
-                self.image_phases.insert(3,phase)
-                self.image_real_part.insert(3, real)
-                self.image_imaginary_part.insert(3, imaginary)
+                self.image_magnitudes.append(magnitude)
+                self.image_phases.append(phase)
+                self.image_real_part.append(real)
+                self.image_imaginary_part.append(imaginary)
+                self.f_shift.append(f_shift)
+
 
     def show_freq_components(self, index, value):
         print(index, value)
         if value == 'FT Magnitude':
-            print('Entered')
-            self.plot_magnitude(self.image_magnitudes[index],index)
+            self.plot_magnitude(self.f_shift[index],index)
         elif value == "FT Phase":
             self.plot_phase(self.image_phases[index],index)
         elif value == "FT Real Components" :
@@ -429,15 +440,16 @@ class UI(QMainWindow):
         else:
             print("enter imaginary")
             self.plot_imaginary(self.image_imaginary_part[index],index)
+
     def compute_magnitude_and_phase(self, image_data):
         image_fourier_transform = np.fft.fft2(image_data)
         f_shift = np.fft.fftshift(image_fourier_transform)
-        magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)
-        phase_spectrum = np.angle(f_shift)
-        return magnitude_spectrum,phase_spectrum
+        magnitude = np.abs(f_shift)
+        phase = np.angle(f_shift)
+        return magnitude, phase ,f_shift
 
-
-    def plot_magnitude(self, magnitude_spectrum, index):
+    def plot_magnitude(self, f_shift, index):
+        magnitude_spectrum = 20 * np.log(np.clip(np.abs(f_shift), 1e-10, None) + 1)
         magnitude_spectrum = np.uint8(np.clip(magnitude_spectrum, 0, 255))
         height, width = magnitude_spectrum.shape
         qimage = QImage(magnitude_spectrum.data, width, height, QImage.Format_Grayscale8)
@@ -487,6 +499,7 @@ class UI(QMainWindow):
 
     def select_mixer_region(self,index,value):
         self.selected_mixer_region = value
+        self.update_output()
     def select_port(self,index,value):
         self.selected_port = value
         self.selected_port_indx = index
@@ -509,112 +522,21 @@ class UI(QMainWindow):
 
         # Debugging output
         print(f"Index: {index}, Value: {value}")
-
-    def reconstruct_and_display_in_label(self, index):
-        self.output_label[index].clear()
-
-        # Ensure we have the same number of magnitudes and phases
-        num_images = len(self.image_magnitudes)
-        self.combined_magnitude = np.zeros_like(self.weighted_magnitude[0])
-        self.combined_phase = np.zeros_like(self.weighted_phase[0])
-
-        # Combine all images' magnitudes and phases
-        for i in range(num_images):
-            self.combined_magnitude += self.weighted_magnitude[i]
-            self.combined_phase += self.weighted_phase[i]
-
-        # Normalize the combined magnitude
-        combined_magnitude = np.clip(self.combined_magnitude, 0, np.max(self.combined_magnitude))
-
-        # Reconstruct the complex Fourier spectrum
-        complex_spectrum = combined_magnitude * np.exp(1j * self.combined_phase)
-
-        # Compute the inverse Fourier transform
-        reconstructed_image = np.fft.ifft2(complex_spectrum)
-        reconstructed_image = np.real(reconstructed_image)
-
-        # Normalize the image for display
-        reconstructed_image -= reconstructed_image.min()
-        if reconstructed_image.max() > 0:
-            reconstructed_image /= reconstructed_image.max()
-        reconstructed_image *= 255  # Scale to 0-255
-        reconstructed_image = reconstructed_image.astype(np.uint8)
-
-        # Convert to QImage
-        height, width = reconstructed_image.shape
-        q_image = QImage(reconstructed_image.tobytes(), width, height, width, QImage.Format_Grayscale8)
-
-        # Display in QLabel
-        pixmap = QPixmap.fromImage(q_image)
-        self.output_label[index].setPixmap(
-            pixmap.scaled(self.output_label[index].size(), QtCore.Qt.KeepAspectRatio,
-                          QtCore.Qt.SmoothTransformation))
-        self.output_label[index].setAlignment(Qt.AlignCenter)
-
-
-
-    def compute_fft(self,image):
-        """Compute the FFT of an image and return magnitude and phase."""
-        f = np.fft.fft2(image)
-        f_shift = np.fft.fftshift(f)
-        magnitude = np.abs(f_shift)
-        phase = np.angle(f_shift)
-        return magnitude, phase
-
-    def combine_fft(self,magnitude, phase):
-        """Combine magnitude and phase into a single FFT."""
-        combined = magnitude * np.exp(1j * phase)
-        return np.fft.ifftshift(combined)
-
-    def update_component(self, index, value):
-        if self.selected_port == "Port 1":
-            rect = self.freq_component_label[index].selection_rect
-            if not rect:  # Handle case where no rectangle is selected
-                return
-
-            start_x, start_y, width, height = rect.x(), rect.y(), rect.width(), rect.height()
-            value = value / 100  # Normalize slider value between 0 and 1
-
-            x_end = min(start_x + width, self.image_magnitudes[index].shape[1])
-            y_end = min(start_y + height, self.image_magnitudes[index].shape[0])
-
-            if self.output_freq_components1 == "Magnitude":
-                selected_magnitude = self.image_magnitudes[index][start_y:y_end, start_x:x_end].copy()
-                selected_phase = self.image_phases[index][start_y:y_end, start_x:x_end].copy()
-
-                # Scale the magnitude, but leave the phase unchanged
-                self.weighted_magnitude[index] = selected_magnitude * value
-                self.weighted_phase[index] = selected_phase
-            else:
-                selected_phase = self.image_phases[index][start_y:y_end, start_x:x_end].copy()
-                selected_magnitude = self.image_magnitudes[index][start_y:y_end, start_x:x_end].copy()
-
-                # Scale the phase, but leave the magnitude unchanged
-                self.weighted_phase[index] = selected_phase * value
-                self.weighted_magnitude[index] = selected_magnitude
-
-            self.reconstruct_and_display_in_label(self.selected_port_indx)
-
-    import numpy as np
-
     def mix_images(self, magnitude_list, phase_list, weights, modes):
-        # Ensure lists are the same length
-        # if len(magnitude_list) != len(phase_list) or len(magnitude_list) != len(weights):
-        #     raise ValueError("Mismatch in lengths of magnitudes, phases, and weights.")
-
         # Initialize weighted magnitude and phase
         combined_magnitude = np.zeros_like(magnitude_list[0])
         combined_phase = np.zeros_like(phase_list[0])
 
         # Iterate through each image and mix based on weights and modes
+
         for i in range(len(weights)):
             weight = weights[i]
             mode = modes[i]
-
             if weight > 0:  # Only process if weight is non-zero
                 if mode == "Magnitude":
                     # Add weighted magnitude
                     combined_magnitude += weight * magnitude_list[i]
+                    print(combined_magnitude)
                 elif mode == "Phase":
                     # Add weighted phase
                     combined_phase += weight * phase_list[i]
@@ -633,46 +555,47 @@ class UI(QMainWindow):
 
         return mixed_image
 
+
+
+    def create_image_from_components(self, magnitude, phase):
+        dft_shift = magnitude * np.exp(1j * phase)
+        dft = np.fft.ifftshift(dft_shift)
+        img_back = np.abs(np.fft.ifft2(dft))
+        return np.uint8(np.clip(img_back, 0, 255))
+
     def update_output(self):
-        # Retrieve weights (slider values) and modes (comboBox selections)
-        weights = [slider.value() / 100 for slider in self.sliders]  # Normalize slider values to [0, 1]
-        modes = [comboBox.currentText() for comboBox in self.output_combo]
+        mixed_magnitude = np.zeros_like(self.image_magnitudes[0])
+        mixed_phase = np.zeros_like(self.image_phases[0])
 
-        # Mix images with the dynamically fetched weights and modes
-        mixed_image = self.mix_images(self.image_magnitudes, self.image_phases, weights, modes)
+        for i in range(4):
+            weight = self.sliders[i].value() / 100.0
+            if self.output_combo[i].currentText() == "Magnitude":
+                mixed_magnitude += weight * self.image_magnitudes[i]
+            else:
+                mixed_phase += weight * self.image_phases[i]
 
-        height, width = mixed_image.shape
-        q_image = QImage(mixed_image.tobytes(), width, height, width, QImage.Format_Grayscale8)
+        # Create the mixed image
+        output_image = self.create_image_from_components(mixed_magnitude, mixed_phase)
 
-        # Display in QLabel
-        pixmap = QPixmap.fromImage(q_image)
-        self.output_label[0].setPixmap(
-            pixmap.scaled(self.output_label[0].size(), QtCore.Qt.KeepAspectRatio,
-                          QtCore.Qt.SmoothTransformation))
-        self.output_label[0].setAlignment(Qt.AlignCenter)
+        # Convert to QImage
+        output_qimage = QImage(
+            output_image.data, output_image.shape[1], output_image.shape[0],
+            output_image.strides[0], QImage.Format_Grayscale8
+        )
 
+        # Convert QImage to QPixmap and scale it to fill the label
+        pixmap = QPixmap.fromImage(output_qimage)
+        scaled_pixmap = pixmap.scaled(
+            self.output_label[0].size(),  # Scale to the size of the label
+            Qt.IgnoreAspectRatio,  # Ignore aspect ratio
+            Qt.SmoothTransformation  # Smooth scaling
+        )
 
-
-        # Display the mixed image
-        self.display_image(mixed_image)
-
-    def display_image(self, image):
-        # Normalize the image
-        normalized_image = self.normalize_image(image)
-
-        # Convert numpy.ndarray to QImage
-        height, width = normalized_image.shape
-        # Ensure the image has the correct shape (grayscale image)
-        q_image = QImage(normalized_image.data, width, height, width, QImage.Format_Grayscale8)
-
-        # Convert QImage to QPixmap and set it to the QLabel
-        pixmap = QPixmap.fromImage(q_image)
-        self.output_label[0].setPixmap(pixmap)
-
-    def normalize_image(self,image):
-        # Normalize the image to range [0, 255]
-        normalized = 255 * (image - np.min(image)) / (np.max(image) - np.min(image))
-        return normalized.astype(np.uint8)
+        # Set the scaled pixmap to the appropriate QLabel
+        if self.selected_port == "Port 1":
+            self.output_label[0].setPixmap(scaled_pixmap)
+        else:
+            self.output_label[1].setPixmap(scaled_pixmap)
 
     def change_slider(self,index,value):
         self.update_output()
