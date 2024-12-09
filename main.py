@@ -100,15 +100,14 @@ class UI(QMainWindow):
         self.selected_port='Port 1'
         self.selected_mixer_region = "Inner"
         self.output_combo = []
-        self.output_freq_components1 = "Phase"
-        self.output_freq_components2 = "Phase"
-        self.output_freq_components3 = "Phase"
-        self.output_freq_components4 = "Phase"
+        self.selected_magnitude= []
+        self.selected_phase = []
         self.combined_magnitude = None
         self.combined_phase = None
         self.start_point = None
         self.end_point = None
         self.selection_rect = None
+        self.retangle =None
         self.selection_manager = SelectionManager()
 
 
@@ -119,6 +118,7 @@ class UI(QMainWindow):
         main_layout = QHBoxLayout()
 
         left_layout = QVBoxLayout()
+        self.selection_manager.selection_changed.connect(self.update_magnitude_and_phase_list)
 
         # section 1: input images
         section1_layout = QGridLayout()
@@ -307,7 +307,10 @@ class UI(QMainWindow):
 
         # mixer Region Section
         mixer_region_combobox = QComboBox()
-        mixer_region_combobox.addItems(["Inner", "Outer"])
+        mixer_region_combobox.addItems(["Inner","Outer"])
+        mixer_region_combobox.currentIndexChanged.connect(
+            lambda index, combo=mixer_region_combobox: self.select_mixer_region(index, combo.currentText())
+        )
         mixer_region_combobox.setStyleSheet("""
                 QComboBox {
                     background-color: #8B0047; 
@@ -454,9 +457,7 @@ class UI(QMainWindow):
         height, width = magnitude_spectrum.shape
         qimage = QImage(magnitude_spectrum.data, width, height, QImage.Format_Grayscale8)
         pixmap = QPixmap.fromImage(qimage)
-        self.freq_component_label[index].setPixmap(
-            pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
-                          QtCore.Qt.SmoothTransformation))
+        self.freq_component_label[index].setPixmap(pixmap)
 
     def plot_phase(self,phase_spectrum,index):
         phase_spectrum_normalized = np.uint8(np.clip(((phase_spectrum + np.pi) / (2 * np.pi)) * 255, 0, 255))
@@ -499,7 +500,8 @@ class UI(QMainWindow):
 
     def select_mixer_region(self,index,value):
         self.selected_mixer_region = value
-        self.update_output()
+        print(f'selected = {value}')
+        self.update_magnitude_and_phase_list()
     def select_port(self,index,value):
         self.selected_port = value
         self.selected_port_indx = index
@@ -521,58 +523,71 @@ class UI(QMainWindow):
             print(f"Invalid index: {index}")
 
         # Debugging output
-        print(f"Index: {index}, Value: {value}")
-    def mix_images(self, magnitude_list, phase_list, weights, modes):
-        # Initialize weighted magnitude and phase
-        combined_magnitude = np.zeros_like(magnitude_list[0])
-        combined_phase = np.zeros_like(phase_list[0])
-
-        # Iterate through each image and mix based on weights and modes
-
-        for i in range(len(weights)):
-            weight = weights[i]
-            mode = modes[i]
-            if weight > 0:  # Only process if weight is non-zero
-                if mode == "Magnitude":
-                    # Add weighted magnitude
-                    combined_magnitude += weight * magnitude_list[i]
-                    print(combined_magnitude)
-                elif mode == "Phase":
-                    # Add weighted phase
-                    combined_phase += weight * phase_list[i]
-                else:
-                    raise ValueError(f"Invalid mode: {mode}. Use 'magnitude' or 'phase'.")
-
-        # Normalize combined magnitude and phase
-        total_weight = sum(weights)
-        if total_weight > 0:
-            combined_magnitude /= total_weight
-            combined_phase /= total_weight
-
-        # Reconstruct the mixed image using inverse FFT
-        mixed_fft = combined_magnitude * np.exp(1j * combined_phase)
-        mixed_image = np.abs(np.fft.ifft2(mixed_fft))
-
-        return mixed_image
-
-
-
+    # def update_region(self):
+    #     self.retangle = self.freq_component_label[0].selection_rect
     def create_image_from_components(self, magnitude, phase):
         dft_shift = magnitude * np.exp(1j * phase)
         dft = np.fft.ifftshift(dft_shift)
         img_back = np.abs(np.fft.ifft2(dft))
         return np.uint8(np.clip(img_back, 0, 255))
 
+    def update_magnitude_and_phase_list(self):
+        rect = self.freq_component_label[0].selection_rect
+        # Coordinates of the rectangle
+        start_x = rect.x()
+        start_y = rect.y()
+        width = rect.width()
+        height = rect.height()
+        end_x = min(start_x + width, self.image_magnitudes[0].shape[1])
+        end_y = min(start_y + height, self.image_magnitudes[0].shape[0])
+
+        self.selected_magnitude.clear()
+        self.selected_phase.clear()
+
+        if self.selected_mixer_region == "Outer":
+            print("inner enter")
+            # Select inside the rectangle
+            for i in range(4):
+                # Select inside the rectangle
+                selected_region = self.image_magnitudes[i][start_y:end_y, start_x:end_x]
+                selected_phase = self.image_phases[i][start_y:end_y, start_x:end_x]
+
+                # Store the selected region and phase for inner region
+                self.selected_magnitude.append(selected_region)
+                self.selected_phase.append(selected_phase)
+        else:
+            print('entered else')
+            self.selected_magnitude.clear()
+            self.selected_phase.clear()
+            for i in range(4):
+                # Create a mask for the selected rectangle
+                mask = np.ones_like(self.image_magnitudes[i], dtype=bool)
+                mask[start_y:end_y, start_x:end_x] = False
+
+                # Apply the mask to get the outer region for magnitude and phase
+                outer_magnitude = self.image_magnitudes[i][mask]
+                outer_phase = self.image_phases[i][mask]
+
+                # Reshape back to 2D, preserving the entire image shape
+                selected_magnitude = np.zeros_like(self.image_magnitudes[i])
+                selected_phase = np.zeros_like(self.image_phases[i])
+                selected_magnitude[mask] = outer_magnitude
+                selected_phase[mask] = outer_phase
+
+                # Store the selected outer region and phase
+                self.selected_magnitude.append(selected_magnitude)
+                self.selected_phase.append(selected_phase)
+
     def update_output(self):
-        mixed_magnitude = np.zeros_like(self.image_magnitudes[0])
-        mixed_phase = np.zeros_like(self.image_phases[0])
+        mixed_magnitude = np.zeros_like(self.selected_magnitude[0])
+        mixed_phase = np.zeros_like(self.selected_phase[0])
 
         for i in range(4):
             weight = self.sliders[i].value() / 100.0
             if self.output_combo[i].currentText() == "Magnitude":
-                mixed_magnitude += weight * self.image_magnitudes[i]
+                mixed_magnitude += weight * self.selected_magnitude[i]
             else:
-                mixed_phase += weight * self.image_phases[i]
+                mixed_phase += weight * self.selected_phase[i]
 
         # Create the mixed image
         output_image = self.create_image_from_components(mixed_magnitude, mixed_phase)
@@ -599,6 +614,7 @@ class UI(QMainWindow):
 
     def change_slider(self,index,value):
         self.update_output()
+        print("A")
 
 
 app = QtWidgets.QApplication([])
