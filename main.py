@@ -478,15 +478,6 @@ class UI(QMainWindow):
 
     #
     def change_output_freq_components(self, index, value):
-        # if index == 0:
-        #     if value == 1 or value == 0:
-        #         self.output_combo[1].setCurrentText("Magnitude")
-        #         self.output_combo[2].setCurrentText("Phase")
-        #         self.output_combo[3].setCurrentText("Magnitude")
-        #     else :
-        #         self.output_combo[1].setCurrentText("Imaginary part")
-        #         self.output_combo[2].setCurrentText("Real part")
-        #         self.output_combo[3].setCurrentText("Imaginary part")
         pass
 
     def create_image_from_components(self, magnitude, phase):
@@ -502,54 +493,61 @@ class UI(QMainWindow):
         return np.uint8(np.clip(img_back, 0, 255))
 
     def update_magnitude_and_phase_list(self):
-        rect = self.freq_component_label[0].selection_rect
-        # Rectangle dimensions
-        width = rect.width()
-        height = rect.height()
+        try :
+            rect = self.freq_component_label[0].selection_rect
+            # Rectangle dimensions
+            width = rect.width()
+            height = rect.height()
 
-        # Compute the center of the frequency domain
-        center_x = self.image_magnitudes[0].shape[1] // 2
-        center_y = self.image_magnitudes[0].shape[0] // 2
+            # Compute the center of the frequency domain
+            center_x = self.image_magnitudes[0].shape[1] // 2
+            center_y = self.image_magnitudes[0].shape[0] // 2
 
-        # Define the low-frequency rectangle around the center
-        start_x = max(center_x - width // 2, 0)
-        start_y = max(center_y - height // 2, 0)
-        end_x = min(center_x + width // 2, self.image_magnitudes[0].shape[1])
-        end_y = min(center_y + height // 2, self.image_magnitudes[0].shape[0])
+            # Define the low-frequency rectangle around the center
+            start_x = max(center_x - width // 2, 0)
+            start_y = max(center_y - height // 2, 0)
+            end_x = min(center_x + width // 2, self.image_magnitudes[0].shape[1])
+            end_y = min(center_y + height // 2, self.image_magnitudes[0].shape[0])
 
-        self.selected_magnitude.clear()
-        self.selected_phase.clear()
-        self.selected_real.clear()
-        self.selected_imaginary.clear()
+            self.selected_magnitude.clear()
+            self.selected_phase.clear()
+            self.selected_real.clear()
+            self.selected_imaginary.clear()
 
-        for i in range(4):
-            # Create a mask for the inner rectangle
-            mask = np.zeros_like(self.image_magnitudes[i], dtype=bool)
-            mask[start_y:end_y, start_x:end_x] = True
+            for i in range(4):
+                # Create a mask for the inner rectangle
+                mask = np.zeros_like(self.image_magnitudes[i], dtype=bool)
+                mask[start_y:end_y, start_x:end_x] = True
 
-            if self.selected_mixer_region == "Inner":
-                print("Selecting low-frequency region (inner rectangle) and zeroing outer components")
+                if self.selected_mixer_region == "Inner":
+                    print("Selecting low-frequency region (inner rectangle) and zeroing outer components")
 
-                # Low-frequency region
-                selected_region = np.where(mask, self.image_magnitudes[i], 0)
-                selected_phase = np.where(mask, self.image_phases[i], 0)
-                selected_real = np.where(mask, self.image_real_part[i], 0)
-                selected_imaginary = np.where(mask, self.image_imaginary_part[i], 0)
+                    # Low-frequency region
+                    selected_region = np.where(mask, self.image_magnitudes[i], 0)
+                    selected_phase = np.where(mask, self.image_phases[i], 0)
+                    selected_real = np.where(mask, self.image_real_part[i], 0)
+                    selected_imaginary = np.where(mask, self.image_imaginary_part[i], 0)
 
-            else:
-                print("Selecting high-frequency region (outer region) and zeroing inner components")
+                else:
+                    print("Selecting high-frequency region (outer region) and zeroing inner components")
 
-                # High-frequency region (zero the inner rectangle)
-                selected_region = np.where(~mask, self.image_magnitudes[i], 0)
-                selected_phase = np.where(~mask, self.image_phases[i], 0)
-                selected_real = np.where(~mask, self.image_real_part[i], 0)
-                selected_imaginary = np.where(~mask, self.image_imaginary_part[i], 0)
+                    # High-frequency region (zero the inner rectangle)
+                    selected_region = np.where(~mask, self.image_magnitudes[i], 0)
+                    selected_phase = np.where(~mask, self.image_phases[i], 0)
+                    selected_real = np.where(~mask, self.image_real_part[i], 0)
+                    selected_imaginary = np.where(~mask, self.image_imaginary_part[i], 0)
 
-            # Store the selected values
-            self.selected_magnitude.append(selected_region)
-            self.selected_phase.append(selected_phase)
-            self.selected_real.append(selected_real)
-            self.selected_imaginary.append(selected_imaginary)
+                # Store the selected values
+                self.selected_magnitude.append(selected_region)
+                self.selected_phase.append(selected_phase)
+                self.selected_real.append(selected_real)
+                self.selected_imaginary.append(selected_imaginary)
+        except:
+            message = QMessageBox()
+            message.setIcon(QMessageBox.Warning)
+            message.setWindowTitle('Error !')
+            message.setText('Select  region from the first label')
+            message.exec_()
 
     def handle_scroll_direction(self, event):
         """Handle the wheel event and process it."""
@@ -637,11 +635,8 @@ class UI(QMainWindow):
             for i in range(4):
                 self.sliders[i].setValue(0)
 
-
-
     def change_slider(self, index, value):
         self.update_output()
-        print("A")
 
 
 app = QtWidgets.QApplication([])
