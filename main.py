@@ -393,17 +393,26 @@ class UI(QMainWindow):
                 self.f_shift.append(f_shift)
 
     def show_freq_components(self, index, value):
-        print(index, value)
-        if value == 'FT Magnitude':
-            self.plot_magnitude(self.f_shift[index], index)
-        elif value == "FT Phase":
-            self.plot_phase(self.image_phases[index], index)
-        elif value == "FT Real Components":
-            print("enter real")
-            self.plot_real(self.image_real_part[index], index)
-        else:
-            print("enter imaginary")
-            self.plot_imaginary(self.image_imaginary_part[index], index)
+        try:
+            if value == 'FT Magnitude':
+                self.plot_magnitude(self.f_shift[index], index)
+            elif value == "FT Phase":
+                self.plot_phase(self.image_phases[index], index)
+            elif value == "FT Real Components":
+                print("enter real")
+                self.plot_real(self.image_real_part[index], index)
+            elif value == "FT Imaginary Components":
+                self.plot_imaginary(self.image_imaginary_part[index], index)
+            else:
+                return
+        except:
+            message = QMessageBox()
+            message.setIcon(QMessageBox.Warning)
+            message.setWindowTitle("Error !")
+            message.setText("Upload image first")
+            message.exec_()
+            self.freq_component_combobox[index].setCurrentText("Choose FT Component")
+
 
     def compute_magnitude_and_phase(self, image_data):
         image_fourier_transform = np.fft.fft2(image_data)
@@ -465,6 +474,7 @@ class UI(QMainWindow):
     def select_port(self, index, value):
         self.selected_port = value
         self.selected_port_indx = index
+        self.update_output()
 
     #
     def change_output_freq_components(self, index, value):
@@ -512,61 +522,34 @@ class UI(QMainWindow):
         self.selected_real.clear()
         self.selected_imaginary.clear()
 
-        if self.selected_mixer_region == "Inner":
-            print("Selecting low-frequency region (inner rectangle)")
-            for i in range(4):
-                # Full magnitude spectrum
-                full_magnitude = self.image_magnitudes[i]
+        for i in range(4):
+            # Create a mask for the inner rectangle
+            mask = np.zeros_like(self.image_magnitudes[i], dtype=bool)
+            mask[start_y:end_y, start_x:end_x] = True
+
+            if self.selected_mixer_region == "Inner":
+                print("Selecting low-frequency region (inner rectangle) and zeroing outer components")
 
                 # Low-frequency region
-                selected_region = self.image_magnitudes[i][start_y:end_y, start_x:end_x]
-                selected_phase = self.image_phases[i][start_y:end_y, start_x:end_x]
-                selected_real = self.image_real_part[i][start_y:end_y, start_x:end_x]
-                selected_imaginary = self.image_imaginary_part[i][start_y:end_y, start_x:end_x]
+                selected_region = np.where(mask, self.image_magnitudes[i], 0)
+                selected_phase = np.where(mask, self.image_phases[i], 0)
+                selected_real = np.where(mask, self.image_real_part[i], 0)
+                selected_imaginary = np.where(mask, self.image_imaginary_part[i], 0)
 
-                # Calculate normalization factor
-                normalization_factor = np.sum(selected_region) / np.sum(full_magnitude)
+            else:
+                print("Selecting high-frequency region (outer region) and zeroing inner components")
 
-                # Normalize the low-frequency magnitudes
-                selected_region = selected_region / normalization_factor
-                scaling_factor = 0.8  # Adjust this value (0.5-1.0) to control brightness further
-                selected_region = selected_region * scaling_factor
+                # High-frequency region (zero the inner rectangle)
+                selected_region = np.where(~mask, self.image_magnitudes[i], 0)
+                selected_phase = np.where(~mask, self.image_phases[i], 0)
+                selected_real = np.where(~mask, self.image_real_part[i], 0)
+                selected_imaginary = np.where(~mask, self.image_imaginary_part[i], 0)
 
-                # Store normalized values
-                self.selected_magnitude.append(selected_region)
-                self.selected_phase.append(selected_phase)
-                self.selected_real.append(selected_real)
-                self.selected_imaginary.append(selected_imaginary)
-
-        else:
-            print("Selecting high-frequency region (outer region)")
-            for i in range(4):
-                # Create a mask to exclude the inner rectangle
-                mask = np.ones_like(self.image_magnitudes[i], dtype=bool)
-                mask[start_y:end_y, start_x:end_x] = False
-
-                # High-frequency region
-                outer_magnitude = self.image_magnitudes[i][mask]
-                outer_phase = self.image_phases[i][mask]
-                outer_real = self.image_real_part[i][mask]
-                outer_imaginary = self.image_imaginary_part[i][mask]
-
-                # Reconstruct the full-sized arrays with the outer region
-                selected_magnitude = np.zeros_like(self.image_magnitudes[i])
-                selected_phase = np.zeros_like(self.image_phases[i])
-                selected_real = np.zeros_like(self.image_real_part[i])
-                selected_imaginary = np.zeros_like(self.image_imaginary_part[i])
-
-                selected_magnitude[mask] = outer_magnitude
-                selected_phase[mask] = outer_phase
-                selected_real[mask] = outer_real
-                selected_imaginary[mask] = outer_imaginary
-
-                # Store the outer region
-                self.selected_magnitude.append(selected_magnitude)
-                self.selected_phase.append(selected_phase)
-                self.selected_real.append(selected_real)
-                self.selected_imaginary.append(selected_imaginary)
+            # Store the selected values
+            self.selected_magnitude.append(selected_region)
+            self.selected_phase.append(selected_phase)
+            self.selected_real.append(selected_real)
+            self.selected_imaginary.append(selected_imaginary)
 
     def handle_scroll_direction(self, event):
         """Handle the wheel event and process it."""
@@ -585,7 +568,7 @@ class UI(QMainWindow):
             mixed_imaginary = np.zeros_like(self.selected_imaginary[0])
 
             # Configure progress bar
-            total_parts = 1000
+            total_parts = 30
             self.progress_bar.setMinimum(0)
             self.progress_bar.setMaximum(total_parts)
             self.progress_bar.setValue(0)
@@ -613,8 +596,6 @@ class UI(QMainWindow):
                 else:
                     mixed_imaginary += weight * self.selected_imaginary[i]
 
-            # Finalize magnitude and phase
-            mixed_magnitude /= total_weight
             mixed_phase = np.angle(mixed_phase)  # Extract phase from complex average
 
             # Create mixed images
@@ -646,13 +627,17 @@ class UI(QMainWindow):
             # Clear combo list
             self.combo.clear()
 
-        except ValueError as e:
+        except:
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Warning)
             msg.setText(f"Error: select a region")
             msg.setWindowTitle("Warning")
             msg.setStandardButtons(QMessageBox.Ok)
             msg.exec_()
+            for i in range(4):
+                self.sliders[i].setValue(0)
+
+
 
     def change_slider(self, index, value):
         self.update_output()
