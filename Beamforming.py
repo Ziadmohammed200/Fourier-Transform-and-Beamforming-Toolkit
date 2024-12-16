@@ -85,18 +85,18 @@ class EmitterArray():
 
 
 class PhasedArray:
-    def __init__(self, name, num_elements=4, spacing_value=50,spacing=0.5, axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=False,position_x=0, position_y=0):
+    def __init__(self, name, num_elements=4, spacing_value=50,spacing=0.5,spacing_unit="Meters", axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=False,position_x=0, position_y=0):
         self.name = name
         self.num_elements = num_elements
         self.spacing = spacing
         self.spacing_value=spacing_value
         self.axis = axis
-        self.spacing_unit="Meters"
+        self.spacing_unit=spacing_unit
         self.speed = speed
         self.frequency = frequency
         self.geometry = geometry
         self.radius = radius
-        self.units=[1e8,1e8]
+        self.units=[1e8,1e9]
         self.steering_angle = np.deg2rad(steering_angle)
         self.semicircle = semicircle
         self.position_x = position_x
@@ -192,6 +192,21 @@ class BeamformingGUI(QMainWindow):
         add_array_button.clicked.connect(self.add_phased_array)
         self.control_panel.addWidget(add_array_button)
 
+        # Wave Emission Control Buttons
+        simulation_layout = QHBoxLayout()
+        first_button = QPushButton("5G simulation")
+        first_button.clicked.connect(self.fifth_generation_simulation)
+        second_button = QPushButton("Ultrasound simulation")
+        second_button.clicked.connect(self.ultrasound_simulation)
+        third_button = QPushButton("Tumor ablation simulation")
+        third_button.clicked.connect(self.tumor_ablation_simulation)
+
+        wave_control_layout.addWidget(first_button)
+        wave_control_layout.addWidget(second_button)
+        wave_control_layout.addWidget(third_button)
+
+        self.control_panel.addLayout(simulation_layout)
+
         # Checkbox for full-circle mode
         self.full_circle_checkbox = QCheckBox("Full Circle Mode (360°)")
         self.full_circle_checkbox.stateChanged.connect(self.toggle_full_circle_mode)
@@ -220,17 +235,20 @@ class BeamformingGUI(QMainWindow):
         plot_layout = QVBoxLayout()
 
         # Wave Emission Plot
-        self.figure_wave = plt.figure(figsize=(8, 8))
+        self.figure_wave = plt.figure(figsize=(6, 6))
         self.canvas_wave = FigureCanvas(self.figure_wave)
+
         plot_layout.addWidget(self.canvas_wave)
 
-        self.figure = plt.figure()
+        self.figure = plt.figure(figsize=(6, 6))
         self.canvas = FigureCanvas(self.figure)
+        self.figure.subplots_adjust(top=0.8)
         plot_layout.addWidget(self.canvas)
 
         # Array Geometry Plot
-        self.figure_geometry = plt.figure()
+        self.figure_geometry = plt.figure(figsize=(6, 6))
         self.canvas_geometry = FigureCanvas(self.figure_geometry)
+        self.figure_geometry.subplots_adjust(bottom=0.2)
         plot_layout.addWidget(self.canvas_geometry)
 
         plot_widget.setLayout(plot_layout)
@@ -494,6 +512,43 @@ class BeamformingGUI(QMainWindow):
         self.update_controls_for_selected_array()
         self.update_plots()
 
+
+    def fifth_generation_simulation(self):
+        self.simulator.phased_arrays=[]
+        self.array_selection_combobox.clear()
+        array_name = "5G array"
+        spacing=(float(3e8)/float(28e9))*0.49
+        phased_array = PhasedArray(name=array_name, num_elements=16, spacing_value=49,spacing=spacing,spacing_unit= "Wavelength (λ)",axis='x', speed=3e8, frequency=28e9)
+        self.simulator.add_phased_array(phased_array)
+        self.array_selection_combobox.addItem(array_name)
+        self.update_controls_for_selected_array()
+        self.update_plots()
+
+    def ultrasound_simulation(self):
+        self.simulator.phased_arrays=[]
+        self.array_selection_combobox.clear()
+        array_name = "Ultrasound array"
+        spacing=(float(1540)/float(5e6))*0.06
+        phased_array = PhasedArray(name=array_name, num_elements=16, spacing_value=6,spacing=spacing,spacing_unit= "Wavelength (λ)",axis='x', speed=1.54e3, frequency=5e6)
+        phased_array.units=[1e3,1e6]
+        self.simulator.add_phased_array(phased_array)
+        self.array_selection_combobox.addItem(array_name)
+        self.update_controls_for_selected_array()
+        self.update_plots()
+
+    # name, num_elements=4, spacing_value=50,spacing=0.5,spacing_unit="Meters", axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=False,position_x=0, position_y=0
+    def tumor_ablation_simulation(self):
+        self.simulator.phased_arrays=[]
+        self.array_selection_combobox.clear()
+        array_name = "Tumor ablation array"
+        # spacing=(float(1540)/float(5e6))*0.06
+        phased_array = PhasedArray(name=array_name, num_elements=8,geometry='curved',axis='x', speed=3e8, frequency=9.15e8,radius=0.10,semicircle=True)
+        phased_array.units=[1e8,1e8]
+        self.simulator.add_phased_array(phased_array)
+        self.array_selection_combobox.addItem(array_name)
+        self.update_controls_for_selected_array()
+        self.update_plots()
+
     def update_controls_for_selected_array(self):
         for i in reversed(range(self.array_controls_layout.count())):
             widget = self.array_controls_layout.itemAt(i).widget()
@@ -565,10 +620,10 @@ class BeamformingGUI(QMainWindow):
 
         radius_label = QLabel(f"Radius (m): {phased_array.radius:.2f}")
         radius_slider = QSlider(Qt.Horizontal)
-        radius_slider.setRange(1, 100)
-        radius_slider.setValue(int(phased_array.radius * 10))
+        radius_slider.setRange(1, 50)
+        radius_slider.setValue(int(phased_array.radius * 100))
         radius_slider.valueChanged.connect(
-            lambda value, pa=phased_array, lbl=radius_label: self.update_slider(pa, 'radius', value / 10, lbl, "Radius (m):"))
+            lambda value, pa=phased_array, lbl=radius_label: self.update_slider(pa, 'radius', value / 100, lbl, "Radius (m):"))
         self.array_controls_layout.addWidget(radius_label)
         self.array_controls_layout.addWidget(radius_slider)
 
@@ -716,7 +771,7 @@ class BeamformingGUI(QMainWindow):
         self.update_plots()
 
     def update_plots(self):
-        theta = np.linspace(-np.pi, np.pi, 1000) if self.full_circle_mode else np.linspace(-np.pi / 2, np.pi / 2, 1000)
+        theta = np.linspace(-np.pi, np.pi, 1000) if self.full_circle_mode else np.linspace(0, np.pi , 1000)
         array_factor = [self.simulator.simulate(t) for t in theta]
         array_factor_db = 20 * np.log10(np.maximum(array_factor, 1e-12))
 
@@ -732,6 +787,7 @@ class BeamformingGUI(QMainWindow):
             ax.set_ylabel("Directivity (dB)")
             ax.set_title("Beam Pattern (Rectangular)")
             ax.grid(True)
+            self.figure.subplots_adjust(bottom=0.2)
         ax.legend()
 
         self.canvas.draw()
