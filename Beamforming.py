@@ -85,7 +85,7 @@ class EmitterArray():
 
 
 class PhasedArray:
-    def __init__(self, name, num_elements=4, spacing_value=50,spacing=0.5,spacing_unit="Meters", axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=False,position_x=0, position_y=0):
+    def __init__(self, name, num_elements=4, spacing_value=50,spacing=0.5,spacing_unit="Meters", axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=True,position_x=0, position_y=0):
         self.name = name
         self.num_elements = num_elements
         self.spacing = spacing
@@ -571,28 +571,48 @@ class BeamformingGUI(QMainWindow):
         self.array_controls_layout.addWidget(elements_label)
         self.array_controls_layout.addWidget(elements_spinbox)
 
+        geometry_label = QLabel("Geometry:")
+        geometry_combobox = QComboBox()
+        geometry_combobox.addItems(["Linear", "Curved"])
+        geometry_combobox.setCurrentText(phased_array.geometry.capitalize())
+        geometry_combobox.currentTextChanged.connect(
+            lambda value, pa=phased_array: self.update_attribute(pa, 'geometry', value.lower()))
+        self.array_controls_layout.addWidget(geometry_label)
+        self.array_controls_layout.addWidget(geometry_combobox)
 
-        spacing_unit_label = QLabel("Spacing Units:")
-        spacing_unit_combobox = QComboBox()
-        spacing_unit_combobox.addItems(["Meters", "Wavelength (λ)"])
-        spacing_unit_combobox.setCurrentText(phased_array.spacing_unit)
-        spacing_unit_combobox.currentTextChanged.connect(
-            lambda value, pa=phased_array: self.update_spacing_units(pa, value))
-        self.array_controls_layout.addWidget(spacing_unit_label)
-        self.array_controls_layout.addWidget(spacing_unit_combobox)
+        if phased_array.geometry.capitalize() == "Linear":
+
+            spacing_unit_label = QLabel("Spacing Units:")
+            spacing_unit_combobox = QComboBox()
+            spacing_unit_combobox.addItems(["Meters", "Wavelength (λ)"])
+            spacing_unit_combobox.setCurrentText(phased_array.spacing_unit)
+            spacing_unit_combobox.currentTextChanged.connect(
+                lambda value, pa=phased_array: self.update_spacing_units(pa, value))
+            self.array_controls_layout.addWidget(spacing_unit_label)
+            self.array_controls_layout.addWidget(spacing_unit_combobox)
 
 
-        if phased_array.spacing_unit == "Meters":
-            spacing_label = QLabel(f"Spacing in (m): {phased_array.spacing_value/100}")
+            if phased_array.spacing_unit == "Meters":
+                spacing_label = QLabel(f"Spacing in (m): {phased_array.spacing_value/100}")
+            else:
+                spacing_label = QLabel(f"Spacing in (λ): {phased_array.spacing_value/100}")
+            spacing_slider = QSlider(Qt.Horizontal)
+            spacing_slider.setRange(1, 100)
+            spacing_slider.setValue(int(phased_array.spacing_value))
+            spacing_slider.valueChanged.connect(
+                lambda value, pa=phased_array, lbl=spacing_label: self.update_spacing_slider(pa, value, lbl, spacing_unit_combobox.currentText()))
+            self.array_controls_layout.addWidget(spacing_label)
+            self.array_controls_layout.addWidget(spacing_slider)
+
         else:
-            spacing_label = QLabel(f"Spacing in (λ): {phased_array.spacing_value/100}")
-        spacing_slider = QSlider(Qt.Horizontal)
-        spacing_slider.setRange(1, 100)
-        spacing_slider.setValue(int(phased_array.spacing_value))
-        spacing_slider.valueChanged.connect(
-            lambda value, pa=phased_array, lbl=spacing_label: self.update_spacing_slider(pa, value, lbl, spacing_unit_combobox.currentText()))
-        self.array_controls_layout.addWidget(spacing_label)
-        self.array_controls_layout.addWidget(spacing_slider)
+            radius_label = QLabel(f"Radius (m): {phased_array.radius:.2f}")
+            radius_slider = QSlider(Qt.Horizontal)
+            radius_slider.setRange(1, 50)
+            radius_slider.setValue(int(phased_array.radius * 100))
+            radius_slider.valueChanged.connect(
+                lambda value, pa=phased_array, lbl=radius_label: self.update_slider(pa, 'radius', value / 100, lbl, "Radius (m):"))
+            self.array_controls_layout.addWidget(radius_label)
+            self.array_controls_layout.addWidget(radius_slider)
 
 
 
@@ -618,23 +638,6 @@ class BeamformingGUI(QMainWindow):
         self.array_controls_layout.addWidget(steering_label)
         self.array_controls_layout.addWidget(steering_slider)
 
-        radius_label = QLabel(f"Radius (m): {phased_array.radius:.2f}")
-        radius_slider = QSlider(Qt.Horizontal)
-        radius_slider.setRange(1, 50)
-        radius_slider.setValue(int(phased_array.radius * 100))
-        radius_slider.valueChanged.connect(
-            lambda value, pa=phased_array, lbl=radius_label: self.update_slider(pa, 'radius', value / 100, lbl, "Radius (m):"))
-        self.array_controls_layout.addWidget(radius_label)
-        self.array_controls_layout.addWidget(radius_slider)
-
-        geometry_label = QLabel("Geometry:")
-        geometry_combobox = QComboBox()
-        geometry_combobox.addItems(["Linear", "Curved"])
-        geometry_combobox.setCurrentText(phased_array.geometry.capitalize())
-        geometry_combobox.currentTextChanged.connect(
-            lambda value, pa=phased_array: self.update_attribute(pa, 'geometry', value.lower()))
-        self.array_controls_layout.addWidget(geometry_label)
-        self.array_controls_layout.addWidget(geometry_combobox)
 
         axis_label = QLabel("Axis (for Linear Arrays):")
         axis_combobox = QComboBox()
@@ -683,6 +686,8 @@ class BeamformingGUI(QMainWindow):
 
     def update_attribute(self, phased_array, attribute, value):
         setattr(phased_array, attribute, value)
+        if attribute == 'geometry':
+            self.update_controls_for_selected_array()
         self.update_plots()
 
     def update_slider(self, phased_array, attribute, value, label, label_text):
