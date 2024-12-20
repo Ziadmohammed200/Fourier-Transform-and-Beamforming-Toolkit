@@ -1,6 +1,7 @@
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtGui import QColor, QPalette
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QComboBox, QWidget, QGridLayout
+from PyQt5.QtGui import QColor, QPalette, QWheelEvent
+from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QComboBox, QWidget, QGridLayout, \
+    QProgressBar, QMessageBox
 from PyQt5.QtWidgets import QFrame
 from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QComboBox, QSlider, QHBoxLayout
 from PyQt5 import QtCore
@@ -13,78 +14,24 @@ from PyQt5 import QtCore
 import numpy as np
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QColor, QPen
 from PIL import Image, ImageQt
-from PyQt5.QtCore import Qt, QRect, QObject, pyqtSignal, QPoint
+from PyQt5.QtCore import Qt, QRect, QObject, pyqtSignal, QPoint, QCoreApplication
+from PyQt5.QtCore import QSize  # If you're using PyQt5
+from ImageLabel import ImageLabel
+from ImageLabel import SelectionManager
+from ImageLabel import ScrollableLabel
 
 
-class SelectionManager(QObject):
-    selection_changed = pyqtSignal(QRect)  # Signal to notify when selection changes
-
-    def __init__(self):
-        super().__init__()
-        self.start_point = None
-        self.end_point = None
-
-    def set_selection(self, start_point: QPoint, end_point: QPoint):
-        self.start_point = start_point
-        self.end_point = end_point
-        rect = QRect(start_point, end_point).normalized()
-        self.selection_changed.emit(rect)
-
-class ImageLabel(QLabel):
-    def __init__(self, selection_manager: SelectionManager, parent=None):
-        super().__init__(parent)
-        self.selection_manager = selection_manager
-        self.selection_manager.selection_changed.connect(self.update_selection)
-        self.start_point = None
-        self.end_point = None
-        self.selection_rect = None
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            # Start drawing rectangle
-            self.start_point = event.pos()
-            self.end_point = self.start_point
-            self.update()
-
-    def mouseMoveEvent(self, event):
-        if self.start_point is not None:
-            # Update rectangle during dragging
-            self.end_point = event.pos()
-            self.update()
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            # Finalize rectangle
-            self.end_point = event.pos()
-            self.selection_rect = QRect(self.start_point, self.end_point).normalized()
-            self.selection_manager.set_selection(self.start_point, self.end_point)
-
-    def paintEvent(self, event):
-        # Draw the image and rectangle
-        super().paintEvent(event)
-        if self.selection_rect:
-            painter = QPainter(self)
-            pen = QPen(QColor("blue"))
-            pen.setWidth(2)
-            painter.setPen(pen)
-            painter.drawRect(self.selection_rect)
-
-    def update_selection(self, rect: QRect):
-        # Update the selection rectangle from the manager
-        self.selection_rect = rect
-        self.update()
 class UI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Image Mag/Phase")
+        self.setWindowTitle("Image Mixer")
         self.setGeometry(100, 100, 1200, 700)
-
         self.dark_theme()
         self.image_labels = []
         self.image_list = {}
         self.image_id = 0
         self.freq_component_combobox = []
-        self.freq_component_label =[]
+        self.freq_component_label = []
         self.image_phases = []
         self.image_magnitudes = []
         self.image_real_part = []
@@ -95,28 +42,29 @@ class UI(QMainWindow):
         self.start = 1
         self.output_label = []
         self.sliders = []
-        self.mixer_region=[]
-        self.f_shift=[]
-        self.selected_port='Port 1'
+        self.mixer_region = []
+        self.f_shift = []
+        self.selected_port = 'Port 1'
         self.selected_mixer_region = "Inner"
         self.output_combo = []
-        self.selected_magnitude= []
+        self.combo = []
+        self.selected_magnitude = []
         self.selected_phase = []
+        self.selected_real = []
+        self.selected_imaginary = []
         self.combined_magnitude = None
         self.combined_phase = None
         self.start_point = None
         self.end_point = None
         self.selection_rect = None
-        self.retangle =None
+        self.retangle = None
         self.selection_manager = SelectionManager()
-
-
-
-
-
-
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.progress_bar.setFormat("Loading: %p%")  # %p% shows the percentage
+        # self.progress_bar.setRange(0, 0)
         main_layout = QHBoxLayout()
-
         left_layout = QVBoxLayout()
         self.selection_manager.selection_changed.connect(self.update_magnitude_and_phase_list)
 
@@ -126,7 +74,7 @@ class UI(QMainWindow):
             # making 4 image lables
             original_image_label = QLabel(f"Original Image {i + 1}")
             image_label = QLabel(f"Add Image {i + 1}")
-            image_label.setFixedSize(400, 250) # 400 is the width, 250 is th eheight
+            image_label.setFixedSize(400, 250)  # 400 is the width, 250 is th eheight
             image_label.setStyleSheet("border: 1px solid #444; background-color: #333; color: white;")
             image_label.setAlignment(QtCore.Qt.AlignCenter)
 
@@ -138,7 +86,8 @@ class UI(QMainWindow):
 
             # Create a combo box
             combo_box = QComboBox()
-            combo_box.addItems(["Choose FT Component",'FT Magnitude','FT Phase',"FT Real Components", "FT Imaginary Components"])
+            combo_box.addItems(
+                ["Choose FT Component", 'FT Magnitude', 'FT Phase', "FT Real Components", "FT Imaginary Components"])
             combo_box.setStyleSheet("""
                 QComboBox {
                     background-color: #8B0047; 
@@ -168,42 +117,51 @@ class UI(QMainWindow):
             section1_layout.addWidget(image_label, 1, i)
             section1_layout.addWidget(combo_box, 2, i)
 
-        # second_label = self.image_labels[1]
-        # second_label.setText("new Text for Second Label")
-        # second_label.setStyleSheet("border: 2px solid red; background-color: #555; color: yellow;")
-
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                background-color: #282828; /* Dark background */
+                border: 2px solid #444; /* Border color */
+                border-radius: 10px; /* Rounded corners */
+                text-align: center; /* Centered text */
+                color: white; /* Text color */
+                font-size: 12px; /* Font size */
+            }
+            QProgressBar::chunk {
+                background-color: #8B0047; /* Chunk (filled part) color */
+                border-radius: 8px; /* Smooth rounded edges for the progress chunk */
+                margin: 1px; /* Add spacing between chunks */
+            }
+        """)
         # Section 2
         section2_layout = QGridLayout()
         for i in range(4):
             ft_label = ImageLabel(self.selection_manager)
-            ft_label.setFixedSize(400, 250)  
+            ft_label.setFixedSize(400, 250)
             ft_label.setStyleSheet("border: 1px solid #444; background-color: #333; color: white;")
             ft_label.setAlignment(QtCore.Qt.AlignCenter)
             section2_layout.addWidget(ft_label, 0, i)
             self.freq_component_label.append(ft_label)
             ft_label.setScaledContents(True)
 
-
         # section 3: output images
         section3_layout = QHBoxLayout()
         for i in range(2):
-            output_label = QLabel(f"Output {i + 1}")
+            output_label = ScrollableLabel(f"Output {i + 1}")
             output_label.setFixedSize(800, 400)
             output_label.setStyleSheet("border: 1px solid #444; background-color: #333; color: white;")
             output_label.setAlignment(QtCore.Qt.AlignCenter)
             self.output_label.append(output_label)
             section3_layout.addWidget(output_label)
+        self.output_label[0].scrollDirectionChanged.connect(self.handle_scroll_direction)
+        self.output_label[1].scrollDirectionChanged.connect(self.handle_scroll_direction)
 
-
-        
         left_layout.addLayout(section1_layout)
         left_layout.addLayout(section2_layout)
         left_layout.addLayout(section3_layout)
 
         right_layout = QVBoxLayout()
 
-        
-        def create_widget(label_text, combo_items,counter):
+        def create_widget(label_text, combo_items, counter):
             # the container for the group
             container = QWidget()
             container_layout = QVBoxLayout()
@@ -307,7 +265,7 @@ class UI(QMainWindow):
 
         # mixer Region Section
         mixer_region_combobox = QComboBox()
-        mixer_region_combobox.addItems(["Inner","Outer"])
+        mixer_region_combobox.addItems(["Inner", "Outer"])
         mixer_region_combobox.currentIndexChanged.connect(
             lambda index, combo=mixer_region_combobox: self.select_mixer_region(index, combo.currentText())
         )
@@ -335,16 +293,17 @@ class UI(QMainWindow):
 
         right_layout.addWidget(mixer_region_frame)
 
-        
-        for i in range(4):  
-            combo_items = ["Phase", "Magnitude","Real part","imaginary part"]
+        for i in range(4):
+            combo_items = ["Phase", "Magnitude", "Real part", "imaginary part"]
             counter = i
-            bordered_widget = create_widget(f"Component {i + 1}", combo_items,counter)
+            bordered_widget = create_widget(f"Component {i + 1}", combo_items, counter)
             right_layout.addWidget(bordered_widget)
 
-
         right_layout.setSpacing(40)  # spacing between elements for clarity
-        right_layout.setContentsMargins(10, 10, 10, 10)  
+        right_layout.setContentsMargins(10, 10, 10, 10)
+        self.progress_bar.setAlignment(QtCore.Qt.AlignCenter)
+        right_layout.addWidget(self.progress_bar)
+
         right_layout.addStretch()  # filling remaining space and ensure a consistent layout
         for index, slider in enumerate(self.sliders):
             slider.valueChanged.connect(lambda value, idx=index: self.change_slider(idx, value))
@@ -352,15 +311,15 @@ class UI(QMainWindow):
             mixer.currentIndexChanged.connect(lambda value=mixer, idx=index: self.change_slider(idx, value))
 
         for index, freq_combo in enumerate(self.output_combo):
-            freq_combo.currentIndexChanged.connect(lambda value=freq_combo, idx=index: self.change_output_freq_components(idx, value))
+            freq_combo.currentIndexChanged.connect(
+                lambda value=freq_combo, idx=index: self.change_output_freq_components(idx, value))
 
         for index, freq_combo in enumerate(self.output_combo):
             freq_combo.currentIndexChanged.connect(
                 lambda value=freq_combo, idx=index: self.change_slider(idx, value))
 
-
-        main_layout.addLayout(left_layout, 4)  
-        main_layout.addLayout(right_layout, 1) 
+        main_layout.addLayout(left_layout, 4)
+        main_layout.addLayout(right_layout, 1)
 
         # central Widget
         central_widget = QWidget()
@@ -387,32 +346,35 @@ class UI(QMainWindow):
             self.image_id = label_index
             self.image_list[self.image_id] = image_array
             height, width = image_array.shape
-            qimage = QImage( image_array.data , width, height, QImage.Format_Grayscale8)
+            qimage = QImage(image_array.data, width, height, QImage.Format_Grayscale8)
             pixmap = QPixmap.fromImage(qimage)
 
             if self.image_id == 0:
-                self.image_labels[0].setPixmap(pixmap.scaled(self.image_labels[0].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-                magnitude, phase , f_shift = self.compute_magnitude_and_phase(image_array)
-                real,imaginary=self.compute_real_and_imaginary(image_array)
+                self.image_labels[0].setPixmap(pixmap.scaled(self.image_labels[0].size(), QtCore.Qt.KeepAspectRatio,
+                                                             QtCore.Qt.SmoothTransformation))
+                magnitude, phase, f_shift = self.compute_magnitude_and_phase(image_array)
+                real, imaginary = self.compute_real_and_imaginary(image_array)
                 self.image_magnitudes.append(magnitude)
                 self.image_phases.append(phase)
                 self.image_real_part.append(real)
                 self.image_imaginary_part.append(imaginary)
                 self.f_shift.append(f_shift)
             elif self.image_id == 1:
-                self.image_labels[1].setPixmap(pixmap.scaled(self.image_labels[1].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-                magnitude,phase,f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
-                real,imaginary=self.compute_real_and_imaginary(image_array)
+                self.image_labels[1].setPixmap(pixmap.scaled(self.image_labels[1].size(), QtCore.Qt.KeepAspectRatio,
+                                                             QtCore.Qt.SmoothTransformation))
+                magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                real, imaginary = self.compute_real_and_imaginary(image_array)
                 self.image_magnitudes.append(magnitude)
                 self.image_phases.append(phase)
-                self.image_real_part.append( real)
-                self.image_imaginary_part.append( imaginary)
+                self.image_real_part.append(real)
+                self.image_imaginary_part.append(imaginary)
                 self.f_shift.append(f_shift)
 
             elif self.image_id == 2:
-                self.image_labels[2].setPixmap(pixmap.scaled(self.image_labels[2].size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation))
-                magnitude,phase,f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
-                real,imaginary=self.compute_real_and_imaginary(image_array)
+                self.image_labels[2].setPixmap(pixmap.scaled(self.image_labels[2].size(), QtCore.Qt.KeepAspectRatio,
+                                                             QtCore.Qt.SmoothTransformation))
+                magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                real, imaginary = self.compute_real_and_imaginary(image_array)
                 self.image_magnitudes.append(magnitude)
                 self.image_phases.append(phase)
                 self.image_real_part.append(real)
@@ -422,34 +384,42 @@ class UI(QMainWindow):
             else:
                 self.image_labels[3].setPixmap(pixmap.scaled(self.image_labels[3].size(), QtCore.Qt.KeepAspectRatio,
                                                              QtCore.Qt.SmoothTransformation))
-                magnitude,phase,f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
-                real,imaginary=self.compute_real_and_imaginary(image_array)
+                magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
+                real, imaginary = self.compute_real_and_imaginary(image_array)
                 self.image_magnitudes.append(magnitude)
                 self.image_phases.append(phase)
                 self.image_real_part.append(real)
                 self.image_imaginary_part.append(imaginary)
                 self.f_shift.append(f_shift)
 
-
     def show_freq_components(self, index, value):
-        print(index, value)
-        if value == 'FT Magnitude':
-            self.plot_magnitude(self.f_shift[index],index)
-        elif value == "FT Phase":
-            self.plot_phase(self.image_phases[index],index)
-        elif value == "FT Real Components" :
-            print("enter real")
-            self.plot_real(self.image_real_part[index],index)
-        else:
-            print("enter imaginary")
-            self.plot_imaginary(self.image_imaginary_part[index],index)
+        try:
+            if value == 'FT Magnitude':
+                self.plot_magnitude(self.f_shift[index], index)
+            elif value == "FT Phase":
+                self.plot_phase(self.image_phases[index], index)
+            elif value == "FT Real Components":
+                print("enter real")
+                self.plot_real(self.image_real_part[index], index)
+            elif value == "FT Imaginary Components":
+                self.plot_imaginary(self.image_imaginary_part[index], index)
+            else:
+                return
+        except:
+            message = QMessageBox()
+            message.setIcon(QMessageBox.Warning)
+            message.setWindowTitle("Error !")
+            message.setText("Upload image first")
+            message.exec_()
+            self.freq_component_combobox[index].setCurrentText("Choose FT Component")
+
 
     def compute_magnitude_and_phase(self, image_data):
         image_fourier_transform = np.fft.fft2(image_data)
         f_shift = np.fft.fftshift(image_fourier_transform)
         magnitude = np.abs(f_shift)
         phase = np.angle(f_shift)
-        return magnitude, phase ,f_shift
+        return magnitude, phase, f_shift
 
     def plot_magnitude(self, f_shift, index):
         magnitude_spectrum = 20 * np.log(np.clip(np.abs(f_shift), 1e-10, None) + 1)
@@ -459,7 +429,7 @@ class UI(QMainWindow):
         pixmap = QPixmap.fromImage(qimage)
         self.freq_component_label[index].setPixmap(pixmap)
 
-    def plot_phase(self,phase_spectrum,index):
+    def plot_phase(self, phase_spectrum, index):
         phase_spectrum_normalized = np.uint8(np.clip(((phase_spectrum + np.pi) / (2 * np.pi)) * 255, 0, 255))
         height, width = phase_spectrum_normalized.shape
         qimage = QImage(phase_spectrum_normalized.data, width, height, QImage.Format_Grayscale8)
@@ -468,15 +438,14 @@ class UI(QMainWindow):
             pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
                           QtCore.Qt.SmoothTransformation))
 
-
     def compute_real_and_imaginary(self, image_data):
         # Compute the Fourier Transform
         image_fourier_transform = np.fft.fft2(image_data)
         # Extract the real part of the Fourier Transform
-        real_part = np.real(image_fourier_transform)
-        imaginary_part = np.imag(image_fourier_transform)
-        return real_part ,imaginary_part
-
+        f_shift = np.fft.fftshift(image_fourier_transform)
+        real_part = np.real(f_shift)
+        imaginary_part = np.imag(f_shift)
+        return real_part, imaginary_part
 
     def plot_real(self, real_part, index):
         real_part_normalized = np.uint8(np.clip(real_part, 0, 255))
@@ -497,124 +466,177 @@ class UI(QMainWindow):
             pixmap.scaled(self.freq_component_label[index].size(), QtCore.Qt.KeepAspectRatio,
                           QtCore.Qt.SmoothTransformation))
 
-
-    def select_mixer_region(self,index,value):
+    def select_mixer_region(self, index, value):
         self.selected_mixer_region = value
         print(f'selected = {value}')
         self.update_magnitude_and_phase_list()
-    def select_port(self,index,value):
+
+    def select_port(self, index, value):
         self.selected_port = value
         self.selected_port_indx = index
+        self.update_output()
 
+    #
     def change_output_freq_components(self, index, value):
-        # Mapping of index to the attribute names
-        attribute_names = [
-            "output_freq_components1",
-            "output_freq_components2",
-            "output_freq_components3",
-            "output_freq_components4"
-        ]
+        pass
 
-        # Ensure the index is within the valid range
-        if 0 <= index < len(attribute_names):
-            # Update the corresponding attribute based on value
-            setattr(self, attribute_names[index], "Magnitude" if value == 1 else "Phase")
-        else:
-            print(f"Invalid index: {index}")
-
-        # Debugging output
-    # def update_region(self):
-    #     self.retangle = self.freq_component_label[0].selection_rect
     def create_image_from_components(self, magnitude, phase):
         dft_shift = magnitude * np.exp(1j * phase)
         dft = np.fft.ifftshift(dft_shift)
         img_back = np.abs(np.fft.ifft2(dft))
         return np.uint8(np.clip(img_back, 0, 255))
 
+    def create_image_from_real_and_imaginary(self, real, imaginary):
+        dft_shift = real + 1j * imaginary
+        dft = np.fft.ifftshift(dft_shift)
+        img_back = np.abs(np.fft.ifft2(dft))
+        return np.uint8(np.clip(img_back, 0, 255))
+
     def update_magnitude_and_phase_list(self):
-        rect = self.freq_component_label[0].selection_rect
-        # Coordinates of the rectangle
-        start_x = rect.x()
-        start_y = rect.y()
-        width = rect.width()
-        height = rect.height()
-        end_x = min(start_x + width, self.image_magnitudes[0].shape[1])
-        end_y = min(start_y + height, self.image_magnitudes[0].shape[0])
+        try :
+            rect = self.freq_component_label[0].selection_rect
+            # Rectangle dimensions
+            width = rect.width()
+            height = rect.height()
 
-        self.selected_magnitude.clear()
-        self.selected_phase.clear()
+            # Compute the center of the frequency domain
+            center_x = self.image_magnitudes[0].shape[1] // 2
+            center_y = self.image_magnitudes[0].shape[0] // 2
 
-        if self.selected_mixer_region == "Outer":
-            print("inner enter")
-            # Select inside the rectangle
-            for i in range(4):
-                # Select inside the rectangle
-                selected_region = self.image_magnitudes[i][start_y:end_y, start_x:end_x]
-                selected_phase = self.image_phases[i][start_y:end_y, start_x:end_x]
+            # Define the low-frequency rectangle around the center
+            start_x = max(center_x - width // 2, 0)
+            start_y = max(center_y - height // 2, 0)
+            end_x = min(center_x + width // 2, self.image_magnitudes[0].shape[1])
+            end_y = min(center_y + height // 2, self.image_magnitudes[0].shape[0])
 
-                # Store the selected region and phase for inner region
-                self.selected_magnitude.append(selected_region)
-                self.selected_phase.append(selected_phase)
-        else:
-            print('entered else')
             self.selected_magnitude.clear()
             self.selected_phase.clear()
+            self.selected_real.clear()
+            self.selected_imaginary.clear()
+
             for i in range(4):
-                # Create a mask for the selected rectangle
-                mask = np.ones_like(self.image_magnitudes[i], dtype=bool)
-                mask[start_y:end_y, start_x:end_x] = False
+                # Create a mask for the inner rectangle
+                mask = np.zeros_like(self.image_magnitudes[i], dtype=bool)
+                mask[start_y:end_y, start_x:end_x] = True
 
-                # Apply the mask to get the outer region for magnitude and phase
-                outer_magnitude = self.image_magnitudes[i][mask]
-                outer_phase = self.image_phases[i][mask]
+                if self.selected_mixer_region == "Inner":
+                    print("Selecting low-frequency region (inner rectangle) and zeroing outer components")
 
-                # Reshape back to 2D, preserving the entire image shape
-                selected_magnitude = np.zeros_like(self.image_magnitudes[i])
-                selected_phase = np.zeros_like(self.image_phases[i])
-                selected_magnitude[mask] = outer_magnitude
-                selected_phase[mask] = outer_phase
+                    # Low-frequency region
+                    selected_region = np.where(mask, self.image_magnitudes[i], 0)
+                    selected_phase = np.where(mask, self.image_phases[i], 0)
+                    selected_real = np.where(mask, self.image_real_part[i], 0)
+                    selected_imaginary = np.where(mask, self.image_imaginary_part[i], 0)
 
-                # Store the selected outer region and phase
-                self.selected_magnitude.append(selected_magnitude)
+                else:
+                    print("Selecting high-frequency region (outer region) and zeroing inner components")
+
+                    # High-frequency region (zero the inner rectangle)
+                    selected_region = np.where(~mask, self.image_magnitudes[i], 0)
+                    selected_phase = np.where(~mask, self.image_phases[i], 0)
+                    selected_real = np.where(~mask, self.image_real_part[i], 0)
+                    selected_imaginary = np.where(~mask, self.image_imaginary_part[i], 0)
+
+                # Store the selected values
+                self.selected_magnitude.append(selected_region)
                 self.selected_phase.append(selected_phase)
+                self.selected_real.append(selected_real)
+                self.selected_imaginary.append(selected_imaginary)
+        except:
+            message = QMessageBox()
+            message.setIcon(QMessageBox.Warning)
+            message.setWindowTitle('Error !')
+            message.setText('Select  region from the first label')
+            message.exec_()
+
+    def handle_scroll_direction(self, event):
+        """Handle the wheel event and process it."""
+        # Check the direction of the scroll
+        if event == 'down':
+            print('down')
+        else:
+            print('up')
 
     def update_output(self):
-        mixed_magnitude = np.zeros_like(self.selected_magnitude[0])
-        mixed_phase = np.zeros_like(self.selected_phase[0])
+        try:
+            # Initialize combined magnitude, phase, real, and imaginary components
+            mixed_magnitude = np.zeros_like(self.selected_magnitude[0])
+            mixed_phase = np.zeros_like(self.selected_phase[0], dtype=np.complex128)  # Allow complex numbers
+            mixed_real = np.zeros_like(self.selected_real[0])
+            mixed_imaginary = np.zeros_like(self.selected_imaginary[0])
 
-        for i in range(4):
-            weight = self.sliders[i].value() / 100.0
-            if self.output_combo[i].currentText() == "Magnitude":
-                mixed_magnitude += weight * self.selected_magnitude[i]
+            # Configure progress bar
+            total_parts = 30
+            self.progress_bar.setMinimum(0)
+            self.progress_bar.setMaximum(total_parts)
+            self.progress_bar.setValue(0)
+            for i in range(total_parts):
+                self.progress_bar.setValue(i + 1)
+                QCoreApplication.processEvents()
+
+            # Averaging weights
+            total_weight = sum([self.sliders[i].value() for i in range(4)]) / 100.0
+            if total_weight == 0:
+                raise ValueError("Weights are zero. Adjust sliders to assign weights.")
+
+            # Mixing components based on user selection
+            for i in range(4):
+                self.combo.append(self.output_combo[i].currentText())
+                weight = self.sliders[i].value() / 100.0
+
+                if self.output_combo[i].currentText() == "Magnitude":
+                    mixed_magnitude += weight * self.selected_magnitude[i]
+                elif self.output_combo[i].currentText() == "Phase":
+                    # Convert phase to complex for proper averaging
+                    mixed_phase += weight * np.exp(1j * self.selected_phase[i])
+                elif self.output_combo[i].currentText() == "Real part":
+                    mixed_real += weight * self.selected_real[i]
+                else:
+                    mixed_imaginary += weight * self.selected_imaginary[i]
+
+            mixed_phase = np.angle(mixed_phase)  # Extract phase from complex average
+
+            # Create mixed images
+            output_mag_and_phase_image = self.create_image_from_components(mixed_magnitude, mixed_phase)
+            output_real_and_imaginary_image = self.create_image_from_real_and_imaginary(mixed_real, mixed_imaginary)
+
+            # Convert images to QPixmap
+            def convert_to_pixmap(image, label_size):
+                qimage = QImage(
+                    image.data, image.shape[1], image.shape[0],
+                    image.strides[0], QImage.Format_Grayscale8
+                )
+                pixmap = QPixmap.fromImage(qimage)
+                return pixmap.scaled(label_size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+
+            scaled_pixmap_mag_phase = convert_to_pixmap(output_mag_and_phase_image, self.output_label[0].size())
+            scaled_pixmap_real_imag = convert_to_pixmap(output_real_and_imaginary_image, self.output_label[0].size())
+
+            # Set the output to the appropriate QLabel
+            if self.selected_port == "Port 1" and ("Magnitude" in self.combo or "Phase" in self.combo):
+                self.output_label[0].setPixmap(scaled_pixmap_mag_phase)
+            elif self.selected_port == "Port 1":
+                self.output_label[0].setPixmap(scaled_pixmap_real_imag)
+            elif self.selected_port == "Port 2" and ("Magnitude" in self.combo or "Phase" in self.combo):
+                self.output_label[1].setPixmap(scaled_pixmap_mag_phase)
             else:
-                mixed_phase += weight * self.selected_phase[i]
+                self.output_label[1].setPixmap(scaled_pixmap_real_imag)
 
-        # Create the mixed image
-        output_image = self.create_image_from_components(mixed_magnitude, mixed_phase)
+            # Clear combo list
+            self.combo.clear()
 
-        # Convert to QImage
-        output_qimage = QImage(
-            output_image.data, output_image.shape[1], output_image.shape[0],
-            output_image.strides[0], QImage.Format_Grayscale8
-        )
+        except:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Warning)
+            msg.setText(f"Error: select a region")
+            msg.setWindowTitle("Warning")
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.exec_()
+            for i in range(4):
+                self.sliders[i].setValue(0)
 
-        # Convert QImage to QPixmap and scale it to fill the label
-        pixmap = QPixmap.fromImage(output_qimage)
-        scaled_pixmap = pixmap.scaled(
-            self.output_label[0].size(),  # Scale to the size of the label
-            Qt.IgnoreAspectRatio,  # Ignore aspect ratio
-            Qt.SmoothTransformation  # Smooth scaling
-        )
-
-        # Set the scaled pixmap to the appropriate QLabel
-        if self.selected_port == "Port 1":
-            self.output_label[0].setPixmap(scaled_pixmap)
-        else:
-            self.output_label[1].setPixmap(scaled_pixmap)
-
-    def change_slider(self,index,value):
+    def change_slider(self, index, value):
         self.update_output()
-        print("A")
 
 
 app = QtWidgets.QApplication([])
