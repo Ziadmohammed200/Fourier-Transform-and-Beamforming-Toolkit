@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QLabel, QSlider, QSpinBox, QCheckBox, QComboBox, QLineEdit, QMessageBox
 )
 from PyQt5.QtCore import Qt, QRegularExpression
+from matplotlib import transforms
 
 
 # Wave Emission Simulation (from first script)
@@ -287,28 +288,42 @@ class BeamformingGUI(QMainWindow):
 
     def setup_wave_plot(self):
         """Setup the dynamic wave interference plot as a heat map"""
-        self.figure_wave.clear()  # Clear previous plot
-        ax = self.figure_wave.add_subplot(111)
-        ax.set_xlim([-50, 50])
-        ax.set_ylim([-50, 50])
-        ax.set_aspect(1)
-        ax.grid(alpha=0.2)
-        ax.set_title("Wave Interference Heat Map")
+        self.figure_wave.clear()
 
-        # Create a 2D grid for interference calculation
-        x = np.linspace(-50, 50, 200)
-        y = np.linspace(-50, 50, 200)
+        # Create subplot with equal aspect ratio
+        ax = self.figure_wave.add_subplot(111)
+        ax.set_aspect('equal')
+
+        # Define the original grid size (visible plot limits)
+        grid_limit = 50
+        original_size = 2 * grid_limit
+
+        # Calculate diagonal length for rotation (expanded grid size)
+        diagonal_length = np.sqrt(2) * original_size
+        expanded_limit = diagonal_length / 2
+
+        # Create an expanded 2D grid for interference calculation
+        x = np.linspace(-expanded_limit, expanded_limit, 500)
+        y = np.linspace(-expanded_limit, expanded_limit, 500)
         X, Y = np.meshgrid(x, y)
 
         # Calculate interference at each point from different phased arrays
         interference = np.zeros_like(X, dtype=float)
+
+        # Store the first enabled array's steering angle for plot rotation
+        rotation_angle = 0
+        for phased_array in self.simulator.phased_arrays:
+            if phased_array.enabled:
+                rotation_angle = np.degrees(phased_array.steering_angle)
+                break
+
         for phased_array in self.simulator.phased_arrays:
             if not phased_array.enabled:
                 continue
 
             wavelength = phased_array.speed / phased_array.frequency
 
-            # Calculate element positions based on array geometry
+            # Calculate element positions and interference
             if phased_array.geometry == 'linear':
                 if phased_array.axis == 'x':
                     element_positions = np.array([
@@ -319,7 +334,7 @@ class BeamformingGUI(QMainWindow):
                             phased_array.num_elements
                         )
                     ])
-                else:  # y-axis
+                else:
                     element_positions = np.array([
                         [phased_array.position_x, y_pos]
                         for y_pos in np.linspace(
@@ -329,7 +344,6 @@ class BeamformingGUI(QMainWindow):
                         )
                     ])
             elif phased_array.geometry == 'curved':
-                # For curved arrays, calculate positions on arc/semicircle
                 angles = np.linspace(0, np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
                                                                                                                       2 * np.pi,
                                                                                                                       phased_array.num_elements)
@@ -339,11 +353,9 @@ class BeamformingGUI(QMainWindow):
                     for angle in angles
                 ])
 
-            # Calculate wave interference from each element
             for element_pos in element_positions:
-                # Calculate phase and distance with steering angle
                 distance = np.sqrt((X - element_pos[0]) ** 2 + (Y - element_pos[1]) ** 2)
-                phase = distance * (2 * np.pi / wavelength) + phased_array.steering_angle
+                phase = 2 * np.pi * distance / wavelength
                 interference += np.cos(phase)
 
         # Normalize interference
@@ -351,12 +363,29 @@ class BeamformingGUI(QMainWindow):
         if range_value > 0:
             interference = (interference - interference.min()) / range_value
 
-        # Create heat map
-        self.im = ax.imshow(interference, extent=[-50, 50, -50, 50],
-                            origin='lower', cmap='coolwarm', alpha=0.7)
+        # Set up the rotated plot
+        tr = transforms.Affine2D().rotate_deg(rotation_angle) + ax.transData
+
+        # Display the expanded heatmap
+        self.im = ax.imshow(interference, extent=(-expanded_limit, expanded_limit, -expanded_limit, expanded_limit),
+                            origin='lower', cmap='coolwarm', alpha=0.7, transform=tr)
+
+        # Set up the plot limits to crop the display to the original size
+        ax.set_xlim(-grid_limit, grid_limit)
+        ax.set_ylim(-grid_limit, grid_limit)
+        ax.grid(True, alpha=0.2)
+
+        # Add colorbar
         plt.colorbar(self.im, ax=ax, label='Interference Intensity')
 
-        # Add array element points
+        # Set title with rotation angle
+        ax.set_title(f"Wave Interference Heat Map (Rotated {rotation_angle:.1f}°)")
+
+        # Add axis labels
+        ax.set_xlabel("Distance (m)")
+        ax.set_ylabel("Distance (m)")
+
+        # Add array element positions
         for phased_array in self.simulator.phased_arrays:
             if not phased_array.enabled:
                 continue
@@ -376,7 +405,6 @@ class BeamformingGUI(QMainWindow):
                         phased_array.num_elements
                     )
                     element_x = np.full_like(element_y, phased_array.position_x)
-
             elif phased_array.geometry == 'curved':
                 angles = np.linspace(0, np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
                                                                                                                       2 * np.pi,
@@ -384,14 +412,12 @@ class BeamformingGUI(QMainWindow):
                 element_x = phased_array.position_x + phased_array.radius * np.cos(angles)
                 element_y = phased_array.position_y + phased_array.radius * np.sin(angles)
 
-            ax.scatter(element_x, element_y, color='black', marker='^', s=30)
+            # Plot array elements with the same rotation transform
+            ax.scatter(element_x, element_y, color='black', marker='^', s=30, transform=tr)
 
         self.canvas_wave.draw()
 
-
-
-
- # Remove start_wave_animation and stop_wave_animation methods
+    # Remove start_wave_animation and stop_wave_animation methods
     def start_wave_animation(self):
         """Start the wave emission animation with a heat map of interference."""
 
