@@ -86,18 +86,20 @@ class EmitterArray():
 
 
 class PhasedArray:
-    def __init__(self, name, num_elements=4, spacing_value=50,spacing=0.5,spacing_unit="Meters", axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=True,position_x=0, position_y=0):
+    def __init__(self, name, num_elements=4, spacing_value=50, spacing=0.5, spacing_unit="Meters",
+                 axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0,
+                 steering_angle=0, semicircle=True, position_x=0, position_y=0):
         self.name = name
         self.num_elements = num_elements
         self.spacing = spacing
-        self.spacing_value=spacing_value
+        self.spacing_value = spacing_value
         self.axis = axis
-        self.spacing_unit=spacing_unit
+        self.spacing_unit = spacing_unit
         self.speed = speed
         self.frequency = frequency
         self.geometry = geometry
         self.radius = radius
-        self.units=[1e8,1e9]
+        self.units = [1e8, 1e9]
         self.steering_angle = np.deg2rad(steering_angle)
         self.semicircle = semicircle
         self.position_x = position_x
@@ -106,14 +108,15 @@ class PhasedArray:
 
     def compute_array_factor(self, theta):
         """Compute the array factor based on the array configuration."""
-        wavelength = self.speed / self.frequency
+        wavelength = float(self.speed) / float(self.frequency)
         k = 2 * np.pi / wavelength  # Wave number
 
+        # Calculate element positions and phase shifts
         if self.geometry == 'linear':
             if self.axis == 'x':
                 positions = np.arange(self.num_elements) * self.spacing + self.position_x
             elif self.axis == 'y':
-                positions = np.zeros(self.num_elements)  # For now, assume all elements along x=0
+                positions = np.arange(self.num_elements) * self.spacing + self.position_y
             else:
                 raise ValueError("Unsupported axis. Use 'x' or 'y'.")
             phase_shifts = k * positions * np.cos(theta - self.steering_angle)
@@ -126,8 +129,13 @@ class PhasedArray:
         else:
             raise ValueError("Unsupported geometry. Use 'linear' or 'curved'.")
 
+        # Compute array factor with normalization for shape stability
         array_factor = np.sum(np.exp(1j * phase_shifts))
-        return np.abs(array_factor)
+        array_factor_magnitude = np.abs(array_factor)
+
+        # Normalize the array factor by the number of elements (N)
+        normalized_array_factor = array_factor_magnitude / self.num_elements
+        return normalized_array_factor
 
 
 class BeamformingSimulator:
@@ -143,7 +151,18 @@ class BeamformingSimulator:
         for phased_array in self.phased_arrays:
             if phased_array.enabled:
                 total_output += phased_array.compute_array_factor(theta)
+        if len(self.phased_arrays) > 1:
+            return self.normalize_total_output(total_output)
         return total_output
+
+    def normalize_total_output(self, total_output):
+        """Normalize total output to account for aperture efficiency."""
+        if len(self.phased_arrays) > 0:
+            max_aperture_size = max([phased_array.num_elements for phased_array in self.phased_arrays])
+            normalized_output = total_output / max_aperture_size
+            return normalized_output
+        return total_output
+
 
 
 class BeamformingGUI(QMainWindow):
@@ -235,16 +254,30 @@ class BeamformingGUI(QMainWindow):
         plot_widget = QWidget()
         plot_layout = QVBoxLayout()
 
-        # Wave Emission Plot
+        # # Wave Emission Plot
+        # self.figure_wave = plt.figure(figsize=(6, 6))
+        # self.canvas_wave = FigureCanvas(self.figure_wave)
+        #
+        # plot_layout.addWidget(self.canvas_wave)
+        #
+        # self.figure = plt.figure(figsize=(6, 6))
+        # self.canvas = FigureCanvas(self.figure)
+        # self.figure.subplots_adjust(top=0.8)
+        # plot_layout.addWidget(self.canvas)
+
+        plot_layout2 = QHBoxLayout()
+
+        # Plot 1: Wave Emission Plot
         self.figure_wave = plt.figure(figsize=(6, 6))
         self.canvas_wave = FigureCanvas(self.figure_wave)
+        plot_layout2.addWidget(self.canvas_wave, stretch=1)  # Assign equal stretch factor
 
-        plot_layout.addWidget(self.canvas_wave)
-
+        # Plot 2: Another Plot
         self.figure = plt.figure(figsize=(6, 6))
         self.canvas = FigureCanvas(self.figure)
         self.figure.subplots_adjust(top=0.8)
-        plot_layout.addWidget(self.canvas)
+        plot_layout2.addWidget(self.canvas, stretch=1)  # Assign equal stretch factor
+        plot_layout.addLayout(plot_layout2)
 
         # Array Geometry Plot
         self.figure_geometry = plt.figure(figsize=(6, 6))
@@ -271,7 +304,7 @@ class BeamformingGUI(QMainWindow):
             # Setup wave emitters similar to the first script's Demo 3
             # obj1= PhasedArray()
             print(phased_array.units[0],phased_array.units[1])
-            c, f = int(phased_array.speed)/int(phased_array.units[0]), int(phased_array.frequency) / int(phased_array.units[1]) *0.2
+            c, f = float(phased_array.speed)/float(phased_array.units[0]), float(phased_array.frequency) / float(phased_array.units[1])
             print(c, f)
             lambda0 = c / f
             N = phased_array.num_elements
@@ -746,7 +779,7 @@ class BeamformingGUI(QMainWindow):
             if attribute == 'speed':
                 phased_array.units[0] = 10 ** exponent
             elif attribute == 'frequency':
-                phased_array.units[1] = 10 ** (exponent - 1)
+                phased_array.units[1] = 10 ** (exponent)
 
             # Check if value is within range
             if not (min_value <= value <= max_value):
@@ -755,6 +788,8 @@ class BeamformingGUI(QMainWindow):
             # Save the value back to the phased_array attribute
             setattr(phased_array, attribute, value)
             print(f"Updated {attribute} to {value:.1e}")
+            # def update_spacing_units(self, phased_array, unit):
+            self.update_spacing_units(phased_array,phased_array.spacing_unit)
             self.update_plots()
 
         except ValueError as e:
@@ -783,7 +818,7 @@ class BeamformingGUI(QMainWindow):
 
     def update_spacing_slider(self, phased_array, value, label, unit):
 
-        wavelength=phased_array.speed/phased_array.frequency
+        wavelength=float(phased_array.speed)/float(phased_array.frequency)
         phased_array.spacing_value = value
 
         if unit == "Meters":
