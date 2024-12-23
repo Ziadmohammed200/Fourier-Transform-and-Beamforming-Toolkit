@@ -6,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton,
-    QLabel, QSlider, QSpinBox, QCheckBox, QComboBox, QLineEdit, QMessageBox
+    QLabel, QSlider, QSpinBox, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QRegularExpression
 from matplotlib import transforms
@@ -254,27 +254,19 @@ class BeamformingGUI(QMainWindow):
         plot_widget = QWidget()
         plot_layout = QVBoxLayout()
 
-        # # Wave Emission Plot
-        # self.figure_wave = plt.figure(figsize=(6, 6))
-        # self.canvas_wave = FigureCanvas(self.figure_wave)
-        #
-        # plot_layout.addWidget(self.canvas_wave)
-        #
-        # self.figure = plt.figure(figsize=(6, 6))
-        # self.canvas = FigureCanvas(self.figure)
-        # self.figure.subplots_adjust(top=0.8)
-        # plot_layout.addWidget(self.canvas)
 
         plot_layout2 = QHBoxLayout()
 
         # Plot 1: Wave Emission Plot
         self.figure_wave = plt.figure(figsize=(6, 6))
         self.canvas_wave = FigureCanvas(self.figure_wave)
+        self.canvas_wave.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         plot_layout2.addWidget(self.canvas_wave, stretch=1)  # Assign equal stretch factor
 
         # Plot 2: Another Plot
         self.figure = plt.figure(figsize=(6, 6))
         self.canvas = FigureCanvas(self.figure)
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.figure.subplots_adjust(top=0.8)
         plot_layout2.addWidget(self.canvas, stretch=1)  # Assign equal stretch factor
         plot_layout.addLayout(plot_layout2)
@@ -282,7 +274,10 @@ class BeamformingGUI(QMainWindow):
         # Array Geometry Plot
         self.figure_geometry = plt.figure(figsize=(6, 6))
         self.canvas_geometry = FigureCanvas(self.figure_geometry)
+        self.canvas_geometry.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.figure_geometry.subplots_adjust(bottom=0.2)
+
+
         plot_layout.addWidget(self.canvas_geometry)
 
         plot_widget.setLayout(plot_layout)
