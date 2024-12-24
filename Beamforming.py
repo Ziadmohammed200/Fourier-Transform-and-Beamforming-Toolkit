@@ -6,9 +6,10 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton,
-    QLabel, QSlider, QSpinBox, QCheckBox, QComboBox, QLineEdit, QMessageBox
+    QLabel, QSlider, QSpinBox, QCheckBox, QComboBox, QLineEdit, QMessageBox, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QRegularExpression
+from matplotlib import transforms
 
 
 # Wave Emission Simulation (from first script)
@@ -85,18 +86,20 @@ class EmitterArray():
 
 
 class PhasedArray:
-    def __init__(self, name, num_elements=4, spacing_value=50,spacing=0.5,spacing_unit="Meters", axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=False,position_x=0, position_y=0):
+    def __init__(self, name, num_elements=4, spacing_value=50, spacing=0.5, spacing_unit="Meters",
+                 axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0,
+                 steering_angle=0, semicircle=True, position_x=0, position_y=0):
         self.name = name
         self.num_elements = num_elements
         self.spacing = spacing
-        self.spacing_value=spacing_value
+        self.spacing_value = spacing_value
         self.axis = axis
-        self.spacing_unit=spacing_unit
+        self.spacing_unit = spacing_unit
         self.speed = speed
         self.frequency = frequency
         self.geometry = geometry
         self.radius = radius
-        self.units=[1e8,1e9]
+        self.units = [1e8, 1e9]
         self.steering_angle = np.deg2rad(steering_angle)
         self.semicircle = semicircle
         self.position_x = position_x
@@ -105,14 +108,15 @@ class PhasedArray:
 
     def compute_array_factor(self, theta):
         """Compute the array factor based on the array configuration."""
-        wavelength = self.speed / self.frequency
+        wavelength = float(self.speed) / float(self.frequency)
         k = 2 * np.pi / wavelength  # Wave number
 
+        # Calculate element positions and phase shifts
         if self.geometry == 'linear':
             if self.axis == 'x':
                 positions = np.arange(self.num_elements) * self.spacing + self.position_x
             elif self.axis == 'y':
-                positions = np.zeros(self.num_elements)  # For now, assume all elements along x=0
+                positions = np.arange(self.num_elements) * self.spacing + self.position_y
             else:
                 raise ValueError("Unsupported axis. Use 'x' or 'y'.")
             phase_shifts = k * positions * np.cos(theta - self.steering_angle)
@@ -125,8 +129,13 @@ class PhasedArray:
         else:
             raise ValueError("Unsupported geometry. Use 'linear' or 'curved'.")
 
+        # Compute array factor with normalization for shape stability
         array_factor = np.sum(np.exp(1j * phase_shifts))
-        return np.abs(array_factor)
+        array_factor_magnitude = np.abs(array_factor)
+
+        # Normalize the array factor by the number of elements (N)
+        normalized_array_factor = array_factor_magnitude / self.num_elements
+        return normalized_array_factor
 
 
 class BeamformingSimulator:
@@ -142,7 +151,18 @@ class BeamformingSimulator:
         for phased_array in self.phased_arrays:
             if phased_array.enabled:
                 total_output += phased_array.compute_array_factor(theta)
+        if len(self.phased_arrays) > 1:
+            return self.normalize_total_output(total_output)
         return total_output
+
+    def normalize_total_output(self, total_output):
+        """Normalize total output to account for aperture efficiency."""
+        if len(self.phased_arrays) > 0:
+            max_aperture_size = max([phased_array.num_elements for phased_array in self.phased_arrays])
+            normalized_output = total_output / max_aperture_size
+            return normalized_output
+        return total_output
+
 
 
 class BeamformingGUI(QMainWindow):
@@ -234,21 +254,30 @@ class BeamformingGUI(QMainWindow):
         plot_widget = QWidget()
         plot_layout = QVBoxLayout()
 
-        # Wave Emission Plot
+
+        plot_layout2 = QHBoxLayout()
+
+        # Plot 1: Wave Emission Plot
         self.figure_wave = plt.figure(figsize=(6, 6))
         self.canvas_wave = FigureCanvas(self.figure_wave)
+        self.canvas_wave.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        plot_layout2.addWidget(self.canvas_wave, stretch=1)  # Assign equal stretch factor
 
-        plot_layout.addWidget(self.canvas_wave)
-
+        # Plot 2: Another Plot
         self.figure = plt.figure(figsize=(6, 6))
         self.canvas = FigureCanvas(self.figure)
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.figure.subplots_adjust(top=0.8)
-        plot_layout.addWidget(self.canvas)
+        plot_layout2.addWidget(self.canvas, stretch=1)  # Assign equal stretch factor
+        plot_layout.addLayout(plot_layout2)
 
         # Array Geometry Plot
         self.figure_geometry = plt.figure(figsize=(6, 6))
         self.canvas_geometry = FigureCanvas(self.figure_geometry)
+        self.canvas_geometry.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.figure_geometry.subplots_adjust(bottom=0.2)
+
+
         plot_layout.addWidget(self.canvas_geometry)
 
         plot_widget.setLayout(plot_layout)
@@ -270,7 +299,7 @@ class BeamformingGUI(QMainWindow):
             # Setup wave emitters similar to the first script's Demo 3
             # obj1= PhasedArray()
             print(phased_array.units[0],phased_array.units[1])
-            c, f = int(phased_array.speed)/int(phased_array.units[0]), int(phased_array.frequency) / int(phased_array.units[1]) *0.2
+            c, f = float(phased_array.speed)/float(phased_array.units[0]), float(phased_array.frequency) / float(phased_array.units[1])
             print(c, f)
             lambda0 = c / f
             N = phased_array.num_elements
@@ -287,28 +316,42 @@ class BeamformingGUI(QMainWindow):
 
     def setup_wave_plot(self):
         """Setup the dynamic wave interference plot as a heat map"""
-        self.figure_wave.clear()  # Clear previous plot
-        ax = self.figure_wave.add_subplot(111)
-        ax.set_xlim([-50, 50])
-        ax.set_ylim([-50, 50])
-        ax.set_aspect(1)
-        ax.grid(alpha=0.2)
-        ax.set_title("Wave Interference Heat Map")
+        self.figure_wave.clear()
 
-        # Create a 2D grid for interference calculation
-        x = np.linspace(-50, 50, 200)
-        y = np.linspace(-50, 50, 200)
+        # Create subplot with equal aspect ratio
+        ax = self.figure_wave.add_subplot(111)
+        ax.set_aspect('equal')
+
+        # Define the original grid size (visible plot limits)
+        grid_limit = 50
+        original_size = 2 * grid_limit
+
+        # Calculate diagonal length for rotation (expanded grid size)
+        diagonal_length = np.sqrt(2) * original_size
+        expanded_limit = diagonal_length / 2
+
+        # Create an expanded 2D grid for interference calculation
+        x = np.linspace(-expanded_limit, expanded_limit, 500)
+        y = np.linspace(-expanded_limit, expanded_limit, 500)
         X, Y = np.meshgrid(x, y)
 
         # Calculate interference at each point from different phased arrays
         interference = np.zeros_like(X, dtype=float)
+
+        # Store the first enabled array's steering angle for plot rotation
+        rotation_angle = 0
+        for phased_array in self.simulator.phased_arrays:
+            if phased_array.enabled:
+                rotation_angle = np.degrees(phased_array.steering_angle)
+                break
+
         for phased_array in self.simulator.phased_arrays:
             if not phased_array.enabled:
                 continue
 
             wavelength = phased_array.speed / phased_array.frequency
 
-            # Calculate element positions based on array geometry
+            # Calculate element positions and interference
             if phased_array.geometry == 'linear':
                 if phased_array.axis == 'x':
                     element_positions = np.array([
@@ -319,7 +362,7 @@ class BeamformingGUI(QMainWindow):
                             phased_array.num_elements
                         )
                     ])
-                else:  # y-axis
+                else:
                     element_positions = np.array([
                         [phased_array.position_x, y_pos]
                         for y_pos in np.linspace(
@@ -329,7 +372,6 @@ class BeamformingGUI(QMainWindow):
                         )
                     ])
             elif phased_array.geometry == 'curved':
-                # For curved arrays, calculate positions on arc/semicircle
                 angles = np.linspace(0, np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
                                                                                                                       2 * np.pi,
                                                                                                                       phased_array.num_elements)
@@ -339,11 +381,9 @@ class BeamformingGUI(QMainWindow):
                     for angle in angles
                 ])
 
-            # Calculate wave interference from each element
             for element_pos in element_positions:
-                # Calculate phase and distance with steering angle
                 distance = np.sqrt((X - element_pos[0]) ** 2 + (Y - element_pos[1]) ** 2)
-                phase = distance * (2 * np.pi / wavelength) + phased_array.steering_angle
+                phase = 2 * np.pi * distance / wavelength
                 interference += np.cos(phase)
 
         # Normalize interference
@@ -351,12 +391,29 @@ class BeamformingGUI(QMainWindow):
         if range_value > 0:
             interference = (interference - interference.min()) / range_value
 
-        # Create heat map
-        self.im = ax.imshow(interference, extent=[-50, 50, -50, 50],
-                            origin='lower', cmap='coolwarm', alpha=0.7)
+        # Set up the rotated plot
+        tr = transforms.Affine2D().rotate_deg(rotation_angle) + ax.transData
+
+        # Display the expanded heatmap
+        self.im = ax.imshow(interference, extent=(-expanded_limit, expanded_limit, -expanded_limit, expanded_limit),
+                            origin='lower', cmap='coolwarm', alpha=0.7, transform=tr)
+
+        # Set up the plot limits to crop the display to the original size
+        ax.set_xlim(-grid_limit, grid_limit)
+        ax.set_ylim(-grid_limit, grid_limit)
+        ax.grid(True, alpha=0.2)
+
+        # Add colorbar
         plt.colorbar(self.im, ax=ax, label='Interference Intensity')
 
-        # Add array element points
+        # Set title with rotation angle
+        ax.set_title(f"Wave Interference Heat Map (Rotated {rotation_angle:.1f}°)")
+
+        # Add axis labels
+        ax.set_xlabel("Distance (m)")
+        ax.set_ylabel("Distance (m)")
+
+        # Add array element positions
         for phased_array in self.simulator.phased_arrays:
             if not phased_array.enabled:
                 continue
@@ -376,7 +433,6 @@ class BeamformingGUI(QMainWindow):
                         phased_array.num_elements
                     )
                     element_x = np.full_like(element_y, phased_array.position_x)
-
             elif phased_array.geometry == 'curved':
                 angles = np.linspace(0, np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
                                                                                                                       2 * np.pi,
@@ -384,14 +440,12 @@ class BeamformingGUI(QMainWindow):
                 element_x = phased_array.position_x + phased_array.radius * np.cos(angles)
                 element_y = phased_array.position_y + phased_array.radius * np.sin(angles)
 
-            ax.scatter(element_x, element_y, color='black', marker='^', s=30)
+            # Plot array elements with the same rotation transform
+            ax.scatter(element_x, element_y, color='black', marker='^', s=30, transform=tr)
 
         self.canvas_wave.draw()
 
-
-
-
- # Remove start_wave_animation and stop_wave_animation methods
+    # Remove start_wave_animation and stop_wave_animation methods
     def start_wave_animation(self):
         """Start the wave emission animation with a heat map of interference."""
 
@@ -571,28 +625,48 @@ class BeamformingGUI(QMainWindow):
         self.array_controls_layout.addWidget(elements_label)
         self.array_controls_layout.addWidget(elements_spinbox)
 
+        geometry_label = QLabel("Geometry:")
+        geometry_combobox = QComboBox()
+        geometry_combobox.addItems(["Linear", "Curved"])
+        geometry_combobox.setCurrentText(phased_array.geometry.capitalize())
+        geometry_combobox.currentTextChanged.connect(
+            lambda value, pa=phased_array: self.update_attribute(pa, 'geometry', value.lower()))
+        self.array_controls_layout.addWidget(geometry_label)
+        self.array_controls_layout.addWidget(geometry_combobox)
 
-        spacing_unit_label = QLabel("Spacing Units:")
-        spacing_unit_combobox = QComboBox()
-        spacing_unit_combobox.addItems(["Meters", "Wavelength (λ)"])
-        spacing_unit_combobox.setCurrentText(phased_array.spacing_unit)
-        spacing_unit_combobox.currentTextChanged.connect(
-            lambda value, pa=phased_array: self.update_spacing_units(pa, value))
-        self.array_controls_layout.addWidget(spacing_unit_label)
-        self.array_controls_layout.addWidget(spacing_unit_combobox)
+        if phased_array.geometry.capitalize() == "Linear":
+
+            spacing_unit_label = QLabel("Spacing Units:")
+            spacing_unit_combobox = QComboBox()
+            spacing_unit_combobox.addItems(["Meters", "Wavelength (λ)"])
+            spacing_unit_combobox.setCurrentText(phased_array.spacing_unit)
+            spacing_unit_combobox.currentTextChanged.connect(
+                lambda value, pa=phased_array: self.update_spacing_units(pa, value))
+            self.array_controls_layout.addWidget(spacing_unit_label)
+            self.array_controls_layout.addWidget(spacing_unit_combobox)
 
 
-        if phased_array.spacing_unit == "Meters":
-            spacing_label = QLabel(f"Spacing in (m): {phased_array.spacing_value/100}")
+            if phased_array.spacing_unit == "Meters":
+                spacing_label = QLabel(f"Spacing in (m): {phased_array.spacing_value/100}")
+            else:
+                spacing_label = QLabel(f"Spacing in (λ): {phased_array.spacing_value/100}")
+            spacing_slider = QSlider(Qt.Horizontal)
+            spacing_slider.setRange(1, 100)
+            spacing_slider.setValue(int(phased_array.spacing_value))
+            spacing_slider.valueChanged.connect(
+                lambda value, pa=phased_array, lbl=spacing_label: self.update_spacing_slider(pa, value, lbl, spacing_unit_combobox.currentText()))
+            self.array_controls_layout.addWidget(spacing_label)
+            self.array_controls_layout.addWidget(spacing_slider)
+
         else:
-            spacing_label = QLabel(f"Spacing in (λ): {phased_array.spacing_value/100}")
-        spacing_slider = QSlider(Qt.Horizontal)
-        spacing_slider.setRange(1, 100)
-        spacing_slider.setValue(int(phased_array.spacing_value))
-        spacing_slider.valueChanged.connect(
-            lambda value, pa=phased_array, lbl=spacing_label: self.update_spacing_slider(pa, value, lbl, spacing_unit_combobox.currentText()))
-        self.array_controls_layout.addWidget(spacing_label)
-        self.array_controls_layout.addWidget(spacing_slider)
+            radius_label = QLabel(f"Radius (m): {phased_array.radius:.2f}")
+            radius_slider = QSlider(Qt.Horizontal)
+            radius_slider.setRange(1, 50)
+            radius_slider.setValue(int(phased_array.radius * 100))
+            radius_slider.valueChanged.connect(
+                lambda value, pa=phased_array, lbl=radius_label: self.update_slider(pa, 'radius', value / 100, lbl, "Radius (m):"))
+            self.array_controls_layout.addWidget(radius_label)
+            self.array_controls_layout.addWidget(radius_slider)
 
 
 
@@ -618,23 +692,6 @@ class BeamformingGUI(QMainWindow):
         self.array_controls_layout.addWidget(steering_label)
         self.array_controls_layout.addWidget(steering_slider)
 
-        radius_label = QLabel(f"Radius (m): {phased_array.radius:.2f}")
-        radius_slider = QSlider(Qt.Horizontal)
-        radius_slider.setRange(1, 50)
-        radius_slider.setValue(int(phased_array.radius * 100))
-        radius_slider.valueChanged.connect(
-            lambda value, pa=phased_array, lbl=radius_label: self.update_slider(pa, 'radius', value / 100, lbl, "Radius (m):"))
-        self.array_controls_layout.addWidget(radius_label)
-        self.array_controls_layout.addWidget(radius_slider)
-
-        geometry_label = QLabel("Geometry:")
-        geometry_combobox = QComboBox()
-        geometry_combobox.addItems(["Linear", "Curved"])
-        geometry_combobox.setCurrentText(phased_array.geometry.capitalize())
-        geometry_combobox.currentTextChanged.connect(
-            lambda value, pa=phased_array: self.update_attribute(pa, 'geometry', value.lower()))
-        self.array_controls_layout.addWidget(geometry_label)
-        self.array_controls_layout.addWidget(geometry_combobox)
 
         axis_label = QLabel("Axis (for Linear Arrays):")
         axis_combobox = QComboBox()
@@ -683,6 +740,8 @@ class BeamformingGUI(QMainWindow):
 
     def update_attribute(self, phased_array, attribute, value):
         setattr(phased_array, attribute, value)
+        if attribute == 'geometry':
+            self.update_controls_for_selected_array()
         self.update_plots()
 
     def update_slider(self, phased_array, attribute, value, label, label_text):
@@ -715,7 +774,7 @@ class BeamformingGUI(QMainWindow):
             if attribute == 'speed':
                 phased_array.units[0] = 10 ** exponent
             elif attribute == 'frequency':
-                phased_array.units[1] = 10 ** (exponent - 1)
+                phased_array.units[1] = 10 ** (exponent)
 
             # Check if value is within range
             if not (min_value <= value <= max_value):
@@ -724,6 +783,9 @@ class BeamformingGUI(QMainWindow):
             # Save the value back to the phased_array attribute
             setattr(phased_array, attribute, value)
             print(f"Updated {attribute} to {value:.1e}")
+            # def update_spacing_units(self, phased_array, unit):
+            if phased_array.geometry== 'linear':
+                self.update_spacing_units(phased_array,phased_array.spacing_unit)
             self.update_plots()
 
         except ValueError as e:
@@ -752,7 +814,7 @@ class BeamformingGUI(QMainWindow):
 
     def update_spacing_slider(self, phased_array, value, label, unit):
 
-        wavelength=phased_array.speed/phased_array.frequency
+        wavelength=float(phased_array.speed)/float(phased_array.frequency)
         phased_array.spacing_value = value
 
         if unit == "Meters":
