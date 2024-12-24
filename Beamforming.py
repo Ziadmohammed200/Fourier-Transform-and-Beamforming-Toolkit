@@ -117,6 +117,7 @@ class PhasedArray:
                 positions = np.arange(self.num_elements) * self.spacing + self.position_x
             elif self.axis == 'y':
                 positions = np.arange(self.num_elements) * self.spacing + self.position_y
+                # positions = np.zeros(self.num_elements)
             else:
                 raise ValueError("Unsupported axis. Use 'x' or 'y'.")
             phase_shifts = k * positions * np.cos(theta - self.steering_angle)
@@ -258,16 +259,16 @@ class BeamformingGUI(QMainWindow):
         plot_layout2 = QHBoxLayout()
 
         # Plot 1: Wave Emission Plot
-        self.figure_wave = plt.figure(figsize=(6, 6))
+        self.figure_wave = plt.figure(figsize=(8, 8))
         self.canvas_wave = FigureCanvas(self.figure_wave)
         self.canvas_wave.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         plot_layout2.addWidget(self.canvas_wave, stretch=1)  # Assign equal stretch factor
 
         # Plot 2: Another Plot
-        self.figure = plt.figure(figsize=(6, 6))
+        self.figure = plt.figure(figsize=(8, 8))
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.figure.subplots_adjust(top=0.8)
+        # self.figure.subplots_adjust(top=0.8)
         plot_layout2.addWidget(self.canvas, stretch=1)  # Assign equal stretch factor
         plot_layout.addLayout(plot_layout2)
 
@@ -275,7 +276,7 @@ class BeamformingGUI(QMainWindow):
         self.figure_geometry = plt.figure(figsize=(6, 6))
         self.canvas_geometry = FigureCanvas(self.figure_geometry)
         self.canvas_geometry.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.figure_geometry.subplots_adjust(bottom=0.2)
+        self.figure_geometry.subplots_adjust(bottom=0.15)
 
 
         plot_layout.addWidget(self.canvas_geometry)
