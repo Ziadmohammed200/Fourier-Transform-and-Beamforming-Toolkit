@@ -784,7 +784,8 @@ class BeamformingGUI(QMainWindow):
             setattr(phased_array, attribute, value)
             print(f"Updated {attribute} to {value:.1e}")
             # def update_spacing_units(self, phased_array, unit):
-            self.update_spacing_units(phased_array,phased_array.spacing_unit)
+            if phased_array.geometry== 'linear':
+                self.update_spacing_units(phased_array,phased_array.spacing_unit)
             self.update_plots()
 
         except ValueError as e:
