@@ -29,9 +29,12 @@ class UI(QMainWindow):
         self.dark_theme()
         self.image_labels = []
         self.image_list = {}
+        self.scroll_scale=0
         self.image_id = 0
         self.freq_component_combobox = []
         self.freq_component_label = []
+        self.mixed_magnitude=None
+        self.mixed_phase=None
         self.image_phases = [[[0]],[[0]],[[0]],[[0]]]
         self.image_magnitudes = [[[0]],[[0]],[[0]],[[0]]]
         self.image_real_part = [[[0]],[[0]],[[0]],[[0]]]
@@ -40,6 +43,7 @@ class UI(QMainWindow):
         self.weighted_phase = [np.zeros((1, 1))] * 4
         self.selected_port_indx = 0
         self.i=0
+        self.is_updating_output = False
         self.start = 1
         self.output_label = []
         self.sliders = []
@@ -383,11 +387,11 @@ class UI(QMainWindow):
                                                              QtCore.Qt.SmoothTransformation))
                 magnitude, phase, f_shift = self.compute_magnitude_and_phase(image_array)
                 real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(0,magnitude)
-                self.image_phases.insert(0,phase)
-                self.image_real_part.insert(0,real)
-                self.image_imaginary_part.insert(0,imaginary)
-                self.f_shift.insert(0,f_shift)
+                self.image_magnitudes[0] = magnitude
+                self.image_phases[0] = phase
+                self.image_real_part[0] = real
+                self.image_imaginary_part[0] = imaginary
+                self.f_shift[0] = f_shift
                 self.update_magnitude_and_phase_list()
 
             elif self.image_id == 1:
@@ -395,11 +399,11 @@ class UI(QMainWindow):
                                                              QtCore.Qt.SmoothTransformation))
                 magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
                 real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(1, magnitude)
-                self.image_phases.insert(1, phase)
-                self.image_real_part.insert(1, real)
-                self.image_imaginary_part.insert(1, imaginary)
-                self.f_shift.insert(1, f_shift)
+                self.image_magnitudes[1] = magnitude
+                self.image_phases[1] = phase
+                self.image_real_part[1] = real
+                self.image_imaginary_part[1] = imaginary
+                self.f_shift[1] = f_shift
                 self.update_magnitude_and_phase_list()
 
 
@@ -408,11 +412,11 @@ class UI(QMainWindow):
                                                              QtCore.Qt.SmoothTransformation))
                 magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
                 real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(2, magnitude)
-                self.image_phases.insert(2, phase)
-                self.image_real_part.insert(2, real)
-                self.image_imaginary_part.insert(2, imaginary)
-                self.f_shift.insert(2, f_shift)
+                self.image_magnitudes[2] = magnitude
+                self.image_phases[2] = phase
+                self.image_real_part[2] = real
+                self.image_imaginary_part[2] = imaginary
+                self.f_shift[2] = f_shift
                 self.update_magnitude_and_phase_list()
 
 
@@ -421,11 +425,11 @@ class UI(QMainWindow):
                                                              QtCore.Qt.SmoothTransformation))
                 magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
                 real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes.insert(3, magnitude)
-                self.image_phases.insert(3, phase)
-                self.image_real_part.insert(3, real)
-                self.image_imaginary_part.insert(3, imaginary)
-                self.f_shift.insert(3, f_shift)
+                self.image_magnitudes[3] = magnitude
+                self.image_phases[3] = phase
+                self.image_real_part[3] = real
+                self.image_imaginary_part[3] = imaginary
+                self.f_shift[3] = f_shift
                 self.update_magnitude_and_phase_list()
 
     def show_freq_components(self, index, value):
@@ -526,6 +530,8 @@ class UI(QMainWindow):
         return np.uint8(np.clip(img_back, 0, 255))
 
     def update_magnitude_and_phase_list(self):
+        if self.is_updating_output:
+            return
         # try :
         rect = None
         for label in self.freq_component_label:
@@ -534,8 +540,8 @@ class UI(QMainWindow):
                 break
 
         if rect is not None:
-
-
+            try:
+                self.is_updating_output = True
                 width = rect.width()
                 height = rect.height()
 
@@ -583,20 +589,74 @@ class UI(QMainWindow):
                             selected_real = np.where(~mask, self.image_real_part[i], 0)
                             selected_imaginary = np.where(~mask, self.image_imaginary_part[i], 0)
 
-                        self.selected_magnitude.insert(i,selected_region)
-                        self.selected_phase.insert(i,selected_phase)
-                        self.selected_real.insert(i,selected_real)
-                        self.selected_imaginary.insert(i,selected_imaginary)
+                        self.selected_magnitude[i]=selected_region
+                        self.selected_phase[i] = selected_phase
+                        self.selected_real[i]=selected_real
+                        self.selected_imaginary[i]=selected_imaginary
                 self.update_output()
-
+            finally:
+                self.is_updating_output = False
 
     def handle_scroll_direction(self, event):
         """Handle the wheel event and process it."""
-        # Check the direction of the scroll
+        # Define scaling limits
+        min_scale = 0.2
+        max_scale = 2.0
+        step = 0.02
+
+        # Define contrast limits
+        min_contrast = 0.5
+        max_contrast = 2.0
+        contrast_step = 0.1
+
         if event == 'down':
-            print('down')
+            # Zoom out
+            new_scale = max(self.scroll_scale - step, min_scale)
+            if new_scale != self.scroll_scale:
+                self.scroll_scale = new_scale
+                print(f"Scroll scale: {self.scroll_scale}")
+                scaled_magnitude = self.mixed_magnitude * self.scroll_scale
+                self.update_output_image_after_scroll(scaled_magnitude, self.mixed_phase)
+
+        elif event == 'up':
+            # Zoom in
+            new_scale = min(self.scroll_scale + step, max_scale)
+            if new_scale != self.scroll_scale:
+                self.scroll_scale = new_scale
+                print(f"Scroll scale: {self.scroll_scale}")
+                scaled_magnitude = self.mixed_magnitude * self.scroll_scale
+                self.update_output_image_after_scroll(scaled_magnitude, self.mixed_phase)
+
+        elif event == 'right':
+            # Increase contrast
+            new_contrast = min(self.contrast + contrast_step, max_contrast)
+            if new_contrast != self.contrast:
+                self.contrast = new_contrast
+                print(f"Contrast: {self.contrast}")
+                self.update_output_image_with_contrast(self.contrast)
+
+        elif event == 'left':
+            # Decrease contrast
+            new_contrast = max(self.contrast - contrast_step, min_contrast)
+            if new_contrast != self.contrast:
+                self.contrast = new_contrast
+                print(f"Contrast: {self.contrast}")
+                self.update_output_image_with_contrast(self.contrast)
+
+    def update_output_image_after_scroll(self, magnitude, phase):
+
+        # Generate the output image
+        out_image = self.create_image_from_components(magnitude, phase)
+
+        # Convert the image to a pixmap
+        scaled_pixmap_mag_phase = self.convert_to_pixmap(out_image, self.output_label[0].size())
+
+        # Update the label
+        if self.selected_port == "Port 1":
+            self.output_label[0].setPixmap(scaled_pixmap_mag_phase)
         else:
-            print('up')
+            self.output_label[1].setPixmap(scaled_pixmap_mag_phase)
+
 
     def update_output(self):
 
@@ -636,10 +696,10 @@ class UI(QMainWindow):
                 if self.output_combo[i].currentText() == "Magnitude":
                     if not isinstance(self.selected_magnitude[i],list):
                         mixed_magnitude += weight * self.selected_magnitude[i]
-                        print(mixed_magnitude)
+                        self.scroll_scale +=weight
                 elif self.output_combo[i].currentText() == "Phase":
                     if not isinstance(self.selected_phase[i],list):
-                            mixed_phase += weight*np.exp(1j*self.selected_phase[i])
+                            mixed_phase += weight*np.exp( 1j *self.selected_phase[i] )
                 elif self.output_combo[i].currentText() == "Real part":
                     if not isinstance(self.selected_real[i],list):
                         mixed_real += weight * self.selected_real[i]
@@ -647,22 +707,15 @@ class UI(QMainWindow):
                     if not isinstance(self.selected_imaginary[i],list):
                         mixed_imaginary += weight * self.selected_imaginary[i]
             mixed_phase = np.angle(mixed_phase)
+            self.mixed_magnitude=np.copy(mixed_magnitude)
+            self.mixed_phase=np.copy(mixed_phase)
 
             # Create mixed images
             output_mag_and_phase_image = self.create_image_from_components(mixed_magnitude, mixed_phase)
             output_real_and_imaginary_image = self.create_image_from_real_and_imaginary(mixed_real, mixed_imaginary)
-
-            # Convert images to QPixmap
-            def convert_to_pixmap(image, label_size):
-                qimage = QImage(
-                    image.data, image.shape[1], image.shape[0],
-                    image.strides[0], QImage.Format_Grayscale8
-                )
-                pixmap = QPixmap.fromImage(qimage)
-                return pixmap.scaled(label_size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
-
-            scaled_pixmap_mag_phase = convert_to_pixmap(output_mag_and_phase_image, self.output_label[0].size())
-            scaled_pixmap_real_imag = convert_to_pixmap(output_real_and_imaginary_image, self.output_label[0].size())
+            scaled_pixmap_mag_phase = self.convert_to_pixmap(output_mag_and_phase_image, self.output_label[0].size())
+            scaled_pixmap_real_imag = self.convert_to_pixmap(output_real_and_imaginary_image,
+                                                             self.output_label[0].size())
 
             # Set the output to the appropriate QLabel
             if self.selected_port == "Port 1" and ("Magnitude" in self.combo or "Phase" in self.combo):
@@ -677,7 +730,14 @@ class UI(QMainWindow):
             # Clear combo list
             self.combo.clear()
 
-
+            # Convert images to QPixmap
+    def convert_to_pixmap(self,image, label_size):
+        qimage = QImage(
+            image.data, image.shape[1], image.shape[0],
+            image.strides[0], QImage.Format_Grayscale8
+        )
+        pixmap = QPixmap.fromImage(qimage)
+        return pixmap.scaled(label_size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
 
     def change_slider(self, index, value):
         self.update_output()

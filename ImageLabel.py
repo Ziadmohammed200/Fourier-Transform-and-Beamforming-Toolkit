@@ -138,13 +138,24 @@ class ScrollableLabel(QLabel):
 
     def wheelEvent(self, event):
         """Override the wheel event to detect scroll direction and emit signal."""
-        angle = event.angleDelta().y()
-        if angle > 0:
-            scroll_direction = "down"
-        elif angle < 0:
-            scroll_direction = "up"
-        else:
-            scroll_direction = "none"
+        # Get the angle deltas for vertical and horizontal scrolling
+        delta_x = event.angleDelta().x()
+        delta_y = event.angleDelta().y()
+
+        if abs(delta_x) > abs(delta_y):  # Horizontal scroll is dominant
+            if delta_x > 0:
+                scroll_direction = "right"
+            elif delta_x < 0:
+                scroll_direction = "left"
+            else:
+                scroll_direction = "none"
+        else:  # Vertical scroll is dominant
+            if delta_y > 0:
+                scroll_direction = "down"
+            elif delta_y < 0:
+                scroll_direction = "up"
+            else:
+                scroll_direction = "none"
 
         # Emit the signal with the scroll direction
         self.scrollDirectionChanged.emit(scroll_direction)
