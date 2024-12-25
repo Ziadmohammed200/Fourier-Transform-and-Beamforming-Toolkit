@@ -11,6 +11,17 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QRegularExpression
 from matplotlib import transforms
 
+import logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Adjust level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("beamforming_simulator.log"),  # Log to file
+        logging.StreamHandler()  # Log to console
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 # Wave Emission Simulation (from first script)
 def CalculatePhaseFromFocus(x, y, e):
@@ -142,13 +153,17 @@ class PhasedArray:
 class BeamformingSimulator:
     def __init__(self):
         self.phased_arrays = []
+        logger.info("Initialized Beamforming Simulator.")
 
     def add_phased_array(self, phased_array):
+        logger.debug(f"Adding Phased Array: {phased_array.name}")
         self.phased_arrays.append(phased_array)
+        logger.info(f"Phased Array '{phased_array.name}' added.")
 
     def simulate(self, theta):
         """Combine array factors from all enabled phased arrays."""
         total_output = 0
+        logger.debug(f"Simulating for angle {theta:.2f} radians...")
         for phased_array in self.phased_arrays:
             if phased_array.enabled:
                 total_output += phased_array.compute_array_factor(theta)
@@ -302,10 +317,14 @@ class BeamformingGUI(QMainWindow):
             print(phased_array.units[0],phased_array.units[1])
             c, f = float(phased_array.speed)/float(phased_array.units[0]), float(phased_array.frequency) / float(phased_array.units[1])
             print(c, f)
+            # if c<f:
+            #     c+=2*f
+            #     print(c)
             lambda0 = c / f
             N = phased_array.num_elements
 
-            xs = np.linspace(-lambda0, lambda0, N)
+            # xs = np.linspace(-lambda0, lambda0, N)
+            xs = np.linspace(-1, 1, N)
             ys = np.zeros_like(xs)
             for i in range(N):
                 e = Emitter(xs[i], ys[i], c, f, 0)
@@ -324,12 +343,14 @@ class BeamformingGUI(QMainWindow):
         ax.set_aspect('equal')
 
         # Define the original grid size (visible plot limits)
-        grid_limit = 50
-        original_size = 2 * grid_limit
+        # grid_limit = 50
+        # original_size = 2 * grid_limit
 
         # Calculate diagonal length for rotation (expanded grid size)
-        diagonal_length = np.sqrt(2) * original_size
-        expanded_limit = diagonal_length / 2
+        # diagonal_length = np.sqrt(2) * original_size
+        # expanded_limit = diagonal_length / 2
+        grid_limit = max(50,1e6)
+        expanded_limit = np.sqrt(2) * grid_limit
 
         # Create an expanded 2D grid for interference calculation
         x = np.linspace(-expanded_limit, expanded_limit, 500)
@@ -350,7 +371,10 @@ class BeamformingGUI(QMainWindow):
             if not phased_array.enabled:
                 continue
 
-            wavelength = phased_array.speed / phased_array.frequency
+            # wavelength = float(phased_array.speed) / float(phased_array.frequency)
+            wavelength = float(phased_array.speed) / float(phased_array.frequency)
+            k = 2 * np.pi / wavelength
+
 
             # Calculate element positions and interference
             if phased_array.geometry == 'linear':
@@ -384,11 +408,23 @@ class BeamformingGUI(QMainWindow):
 
             for element_pos in element_positions:
                 distance = np.sqrt((X - element_pos[0]) ** 2 + (Y - element_pos[1]) ** 2)
-                phase = 2 * np.pi * distance / wavelength
-                interference += np.cos(phase)
+                # phase = 2 * np.pi * distance / wavelength
+                # phase = (2 * np.pi * distance / wavelength) % (2 * np.pi)
+                # Normalize phase differences relative to reference wavelength
+                phase = (2 * np.pi * distance / wavelength) % (2 * np.pi)
+                normalized_phase = phase / (2 * np.pi)  # Normalize to [0, 1]
+
+                # Add normalized phase contribution
+                interference += np.cos(2 * np.pi * normalized_phase)
+                r = np.sqrt((X - element_pos[0])**2 + (Y - element_pos[1])**2)
+                theta = np.arctan2(Y - element_pos[1], X - element_pos[0])
+                phase_shift = k * r + phased_array.steering_angle
+                interference += np.cos(phase_shift)
+
+                # interference += np.cos(phase)
 
         # Normalize interference
-        range_value = interference.max() - interference.min()
+        range_value = (interference.max() - interference.min())/phased_array.num_elements
         if range_value > 0:
             interference = (interference - interference.min()) / range_value
 
@@ -511,7 +547,7 @@ class BeamformingGUI(QMainWindow):
                             )
                         ])
                 elif phased_array.geometry == 'curved':
-                    angles = np.linspace(0, np.pi,
+                    angles = np.linspace(0, -np.pi,
                                          phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
                                                                                                                 2 * np.pi,
                                                                                                                 phased_array.num_elements)
@@ -597,8 +633,8 @@ class BeamformingGUI(QMainWindow):
         self.array_selection_combobox.clear()
         array_name = "Tumor ablation array"
         # spacing=(float(1540)/float(5e6))*0.06
-        phased_array = PhasedArray(name=array_name, num_elements=8,geometry='curved',axis='x', speed=3e8, frequency=9.15e8,radius=0.10,semicircle=True)
-        phased_array.units=[1e8,1e8]
+        phased_array = PhasedArray(name=array_name, num_elements=64,geometry='curved',axis='x', speed=1540, frequency=5e6,radius=0.10,semicircle=True)
+        phased_array.units=[1e3,1e6]
         self.simulator.add_phased_array(phased_array)
         self.array_selection_combobox.addItem(array_name)
         self.update_controls_for_selected_array()
@@ -773,7 +809,7 @@ class BeamformingGUI(QMainWindow):
             exponent = int(text.split("e+")[-1])
             print(exponent)
             if attribute == 'speed':
-                phased_array.units[0] = 10 ** exponent
+                phased_array.units[0] = 10 **( exponent)
             elif attribute == 'frequency':
                 phased_array.units[1] = 10 ** (exponent)
 
@@ -895,4 +931,10 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     gui = BeamformingGUI()
     gui.show()
-    sys.exit(app.exec_())
+    # sys.exit(app.exec_())
+    try:
+        sys.exit(app.exec_())
+    except Exception as e:
+        logger.critical(f"Unhandled exception: {e}", exc_info=True)
+    finally:
+        logger.info("Beamforming Simulator exited.")
