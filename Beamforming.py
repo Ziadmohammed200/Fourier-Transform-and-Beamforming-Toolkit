@@ -694,14 +694,14 @@ class BeamformingGUI(QMainWindow):
         self.array_controls_layout.addWidget(steering_slider)
 
 
-        axis_label = QLabel("Axis (for Linear Arrays):")
-        axis_combobox = QComboBox()
-        axis_combobox.addItems(["x", "y"])
-        axis_combobox.setCurrentText(phased_array.axis)
-        axis_combobox.currentTextChanged.connect(
-            lambda value, pa=phased_array: self.update_attribute(pa, 'axis', value))
-        self.array_controls_layout.addWidget(axis_label)
-        self.array_controls_layout.addWidget(axis_combobox)
+        # axis_label = QLabel("Axis (for Linear Arrays):")
+        # axis_combobox = QComboBox()
+        # axis_combobox.addItems(["x", "y"])
+        # axis_combobox.setCurrentText(phased_array.axis)
+        # axis_combobox.currentTextChanged.connect(
+        #     lambda value, pa=phased_array: self.update_attribute(pa, 'axis', value))
+        # self.array_controls_layout.addWidget(axis_label)
+        # self.array_controls_layout.addWidget(axis_combobox)
 
 
         position_x_label = QLabel("Position X (m):")
@@ -722,11 +722,11 @@ class BeamformingGUI(QMainWindow):
         self.array_controls_layout.addWidget(position_y_label)
         self.array_controls_layout.addWidget(position_y_spinbox)
 
-        semicircle_checkbox = QCheckBox("Semi-Circle Mode")
-        semicircle_checkbox.setChecked(phased_array.semicircle)
-        semicircle_checkbox.stateChanged.connect(
-            lambda state, pa=phased_array: self.update_attribute(pa, 'semicircle', state == Qt.Checked))
-        self.array_controls_layout.addWidget(semicircle_checkbox)
+        # semicircle_checkbox = QCheckBox("Semi-Circle Mode")
+        # semicircle_checkbox.setChecked(phased_array.semicircle)
+        # semicircle_checkbox.stateChanged.connect(
+        #     lambda state, pa=phased_array: self.update_attribute(pa, 'semicircle', state == Qt.Checked))
+        # self.array_controls_layout.addWidget(semicircle_checkbox)
 
         enabled_checkbox = QCheckBox("Enable Array")
         enabled_checkbox.setChecked(phased_array.enabled)
@@ -872,9 +872,9 @@ class BeamformingGUI(QMainWindow):
             if phased_array.geometry == 'linear':
                 positions = np.arange(phased_array.num_elements) * phased_array.spacing + phased_array.position_x
                 if phased_array.axis == 'x':
-                    ax_geometry.scatter(positions, [i] * len(positions), label=phased_array.name, color=colors(i))
+                    ax_geometry.scatter(positions, [phased_array.position_y] * len(positions), label=phased_array.name, color=colors(i))
                 elif phased_array.axis == 'y':
-                    ax_geometry.scatter([i] * len(positions), positions, label=phased_array.name, color=colors(i))
+                    ax_geometry.scatter([phased_array.position_x] * len(positions), positions, label=phased_array.name, color=colors(i))
             elif phased_array.geometry == 'curved':
                 angles = np.linspace(0, -np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0, 2 * np.pi, phased_array.num_elements)
                 x_positions = phased_array.radius * np.cos(angles)+phased_array.position_x
