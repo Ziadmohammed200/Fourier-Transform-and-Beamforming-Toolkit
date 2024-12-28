@@ -610,38 +610,26 @@ class UI(QMainWindow):
         contrast_step = 0.1
 
         if event == 'down':
-            # Zoom out
             new_scale = max(self.scroll_scale - step, min_scale)
-            if new_scale != self.scroll_scale:
-                self.scroll_scale = new_scale
-                print(f"Scroll scale: {self.scroll_scale}")
-                scaled_magnitude = self.mixed_magnitude * self.scroll_scale
-                self.update_output_image_after_scroll(scaled_magnitude, self.mixed_phase)
-
-        elif event == 'up':
-            # Zoom in
+        elif event=='up':
             new_scale = min(self.scroll_scale + step, max_scale)
-            if new_scale != self.scroll_scale:
-                self.scroll_scale = new_scale
-                print(f"Scroll scale: {self.scroll_scale}")
-                scaled_magnitude = self.mixed_magnitude * self.scroll_scale
-                self.update_output_image_after_scroll(scaled_magnitude, self.mixed_phase)
-
         elif event == 'right':
-            # Increase contrast
-            new_contrast = min(self.contrast + contrast_step, max_contrast)
-            if new_contrast != self.contrast:
-                self.contrast = new_contrast
-                print(f"Contrast: {self.contrast}")
-                self.update_output_image_with_contrast(self.contrast)
+            print('right')
+        else:
+            print('left')
 
-        elif event == 'left':
-            # Decrease contrast
-            new_contrast = max(self.contrast - contrast_step, min_contrast)
-            if new_contrast != self.contrast:
-                self.contrast = new_contrast
-                print(f"Contrast: {self.contrast}")
-                self.update_output_image_with_contrast(self.contrast)
+        # If the scale hasn't changed, no need to update
+        if new_scale == self.scroll_scale:
+            return
+
+        # Update the scroll scale
+        self.scroll_scale = new_scale
+        print(self.scroll_scale)
+
+        # Scale the mixed magnitude and update the output
+        scaled_magnitude = self.mixed_magnitude * self.scroll_scale
+        self.update_output_image_after_scroll(scaled_magnitude, self.mixed_phase)
+
 
     def update_output_image_after_scroll(self, magnitude, phase):
 
@@ -699,7 +687,7 @@ class UI(QMainWindow):
                         self.scroll_scale +=weight
                 elif self.output_combo[i].currentText() == "Phase":
                     if not isinstance(self.selected_phase[i],list):
-                            mixed_phase += weight*np.exp( 1j *self.selected_phase[i] )
+                        mixed_phase += weight*np.exp(1j * (weight * self.selected_phase[i]))
                 elif self.output_combo[i].currentText() == "Real part":
                     if not isinstance(self.selected_real[i],list):
                         mixed_real += weight * self.selected_real[i]
