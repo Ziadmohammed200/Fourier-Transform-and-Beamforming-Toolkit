@@ -1,26 +1,16 @@
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtGui import QColor, QPalette, QWheelEvent
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QComboBox, QWidget, QGridLayout, \
-    QProgressBar, QMessageBox
-from PyQt5.QtWidgets import QFrame
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel, QComboBox, QSlider, QHBoxLayout
-from PyQt5 import QtCore
-from PyQt5.QtWidgets import QLabel, QFileDialog, QComboBox, QGridLayout, QApplication, QWidget
-from PyQt5.QtGui import QPixmap
-from PyQt5 import QtCore
-import sys
+from PyQt5 import QtWidgets
+from PyQt5.QtGui import QPalette
+from PyQt5.QtWidgets import QMainWindow,QProgressBar, QMessageBox
+from PyQt5.QtWidgets import QFileDialog, QGridLayout
 from PyQt5.QtWidgets import QVBoxLayout, QLabel, QComboBox, QSlider, QWidget, QHBoxLayout
 from PyQt5 import QtCore
 import numpy as np
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QColor, QPen
-from PIL import Image, ImageQt
-from PyQt5.QtCore import Qt, QRect, QObject, pyqtSignal, QPoint, QCoreApplication
-from PyQt5.QtCore import QSize  # If you're using PyQt5
+from PyQt5.QtGui import QPixmap, QImage, QColor
+from PIL import Image
+from PyQt5.QtCore import Qt, QCoreApplication
 from ImageLabel import ImageLabel
 from ImageLabel import SelectionManager
 from ImageLabel import ScrollableLabel
-
-
 class UI(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -35,10 +25,10 @@ class UI(QMainWindow):
         self.freq_component_label = []
         self.mixed_magnitude=None
         self.mixed_phase=None
-        self.image_phases = [[[0]],[[0]],[[0]],[[0]]]
-        self.image_magnitudes = [[[0]],[[0]],[[0]],[[0]]]
-        self.image_real_part = [[[0]],[[0]],[[0]],[[0]]]
-        self.image_imaginary_part = [[[0]],[[0]],[[0]],[[0]]]
+        self.__image_phases = [[[0]] for _ in range(4)]
+        self.__image_magnitudes = [[[0]] for _ in range(4)]
+        self.__image_real_part = [[[0]] for _ in range(4)]
+        self.__image_imaginary_part = [[[0]] for _ in range(4)]
         self.weighted_magnitude = [np.zeros((1, 1))] * 4
         self.weighted_phase = [np.zeros((1, 1))] * 4
         self.selected_port_indx = 0
@@ -48,15 +38,15 @@ class UI(QMainWindow):
         self.output_label = []
         self.sliders = []
         self.mixer_region = []
-        self.f_shift = [[0],[0],[0],[0]]
+        self.f_shift = [[0] for _ in range(4)]
         self.selected_port = 'Port 1'
         self.selected_mixer_region = "Inner"
         self.output_combo = []
         self.combo = []
-        self.selected_magnitude =  [[[0]],[[0]],[[0]],[[0]]]
-        self.selected_phase =  [[[0]],[[0]],[[0]],[[0]]]
-        self.selected_real =  [[[0]],[[0]],[[0]],[[0]]]
-        self.selected_imaginary =  [[[0]],[[0]],[[0]],[[0]]]
+        self.__selected_magnitude = [[[0]] for _ in range(4)]
+        self.__selected_phase = [[[0]] for _ in range(4)]
+        self.__selected_real = [[[0]] for _ in range(4)]
+        self.__selected_imaginary = [[[0]] for _ in range(4)]
         self.combined_magnitude = None
         self.combined_phase = None
         self.start_point = None
@@ -381,67 +371,29 @@ class UI(QMainWindow):
             height, width = image_array.shape
             qimage = QImage(image_array.data, width, height, QImage.Format_Grayscale8)
             pixmap = QPixmap.fromImage(qimage)
+            self.image_labels[self.image_id].setPixmap(pixmap.scaled(self.image_labels[self.image_id].size(), QtCore.Qt.KeepAspectRatio,
+                                                         QtCore.Qt.SmoothTransformation))
+            magnitude, phase, f_shift = self.compute_magnitude_and_phase(image_array)
+            real, imaginary = self.compute_real_and_imaginary(image_array)
+            self.set_image_magnitude(self.image_id, magnitude)
+            self.set_image_phase(self.image_id, phase)
+            self.set_image_real(self.image_id, real)
+            self.set_image_imaginary(self.image_id, imaginary)
+            self.set_f_shift(self.image_id, f_shift)
+            self.update_magnitude_and_phase_list()
+            print(self.__image_magnitudes[0])
 
-            if self.image_id == 0:
-                self.image_labels[0].setPixmap(pixmap.scaled(self.image_labels[0].size(), QtCore.Qt.KeepAspectRatio,
-                                                             QtCore.Qt.SmoothTransformation))
-                magnitude, phase, f_shift = self.compute_magnitude_and_phase(image_array)
-                real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes[0] = magnitude
-                self.image_phases[0] = phase
-                self.image_real_part[0] = real
-                self.image_imaginary_part[0] = imaginary
-                self.f_shift[0] = f_shift
-                self.update_magnitude_and_phase_list()
-
-            elif self.image_id == 1:
-                self.image_labels[1].setPixmap(pixmap.scaled(self.image_labels[1].size(), QtCore.Qt.KeepAspectRatio,
-                                                             QtCore.Qt.SmoothTransformation))
-                magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
-                real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes[1] = magnitude
-                self.image_phases[1] = phase
-                self.image_real_part[1] = real
-                self.image_imaginary_part[1] = imaginary
-                self.f_shift[1] = f_shift
-                self.update_magnitude_and_phase_list()
-
-
-            elif self.image_id == 2:
-                self.image_labels[2].setPixmap(pixmap.scaled(self.image_labels[2].size(), QtCore.Qt.KeepAspectRatio,
-                                                             QtCore.Qt.SmoothTransformation))
-                magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
-                real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes[2] = magnitude
-                self.image_phases[2] = phase
-                self.image_real_part[2] = real
-                self.image_imaginary_part[2] = imaginary
-                self.f_shift[2] = f_shift
-                self.update_magnitude_and_phase_list()
-
-
-            else:
-                self.image_labels[3].setPixmap(pixmap.scaled(self.image_labels[3].size(), QtCore.Qt.KeepAspectRatio,
-                                                             QtCore.Qt.SmoothTransformation))
-                magnitude, phase, f_shift = self.compute_magnitude_and_phase(self.image_list[self.image_id])
-                real, imaginary = self.compute_real_and_imaginary(image_array)
-                self.image_magnitudes[3] = magnitude
-                self.image_phases[3] = phase
-                self.image_real_part[3] = real
-                self.image_imaginary_part[3] = imaginary
-                self.f_shift[3] = f_shift
-                self.update_magnitude_and_phase_list()
 
     def show_freq_components(self, index, value):
         try:
             if value == 'FT Magnitude':
-                self.plot_magnitude(self.f_shift[index], index)
+                self.plot_magnitude(self.get_f_shift(index), index)
             elif value == "FT Phase":
-                self.plot_phase(self.image_phases[index], index)
+                self.plot_phase(self.get_image_phase(index), index)
             elif value == "FT Real Components":
-                self.plot_real(self.image_real_part[index], index)
+                self.plot_real(self.get_image_real(index), index)
             elif value == "FT Imaginary Components":
-                self.plot_imaginary(self.image_imaginary_part[index], index)
+                self.plot_imaginary(self.get_image_imaginary(index), index)
             else:
                 return
         except:
@@ -545,54 +497,51 @@ class UI(QMainWindow):
                 width = rect.width()
                 height = rect.height()
 
-                if self.image_magnitudes[0][0][0] > 0:
-                    center_x = self.image_magnitudes[0].shape[1] // 2
-                    center_y = self.image_magnitudes[0].shape[0] // 2
+                if self.get_image_magnitude(0)[0][0] > 0:
+                    center_x = self.get_image_magnitude(0).shape[1] // 2
+                    center_y = self.get_image_magnitude(0).shape[0] // 2
                     self.i=0
-                elif self.image_magnitudes[1][0][0] > 0:
-                    center_x = self.image_magnitudes[1].shape[1] // 2
-                    center_y = self.image_magnitudes[1].shape[0] // 2
+                elif self.get_image_magnitude(1)[0][0] > 0:
+                    center_x = self.get_image_magnitude(1).shape[1] // 2
+                    center_y = self.get_image_magnitude(1).shape[0] // 2
                     self.i=1
-                elif self.image_magnitudes[2][0][0] > 0:
-                    center_x = self.image_magnitudes[2].shape[1] // 2
-                    center_y = self.image_magnitudes[2].shape[0] // 2
+                elif self.get_image_magnitude(2)[0][0] > 0:
+                    center_x = self.get_image_magnitude(2).shape[1] // 2
+                    center_y = self.get_image_magnitude(2).shape[0] // 2
                     self.i=2
                 else:
-                    center_x = self.image_magnitudes[3].shape[1] // 2
-                    center_y = self.image_magnitudes[3].shape[0] // 2
+                    center_x = self.get_image_magnitude(3).shape[1] // 2
+                    center_y = self.get_image_magnitude(3).shape[0] // 2
                     self.i=3
 
 
 
                 start_x = max(center_x - width // 2, 0)
                 start_y = max(center_y - height // 2, 0)
-                end_x = min(center_x + width // 2, self.image_magnitudes[self.i].shape[1])
-                end_y = min(center_y + height // 2, self.image_magnitudes[self.i].shape[0])
+                end_x = min(center_x + width // 2, self.get_image_magnitude(self.i).shape[1])
+                end_y = min(center_y + height // 2, self.get_image_magnitude(self.i).shape[0])
 
                 for i in range(4):
                     # Create a mask for the inner rectangle
-                    if self.image_magnitudes[i][0][0] != 0:
-                        mask = np.zeros_like(self.image_magnitudes[i], dtype=bool)
+                    if self.get_image_magnitude(i)[0][0] != 0:
+                        mask = np.zeros_like(self.get_image_magnitude(i), dtype=bool)
                         mask[start_y:end_y, start_x:end_x] = True
 
-                        if self.selected_mixer_region == "Inner":
-
-                            selected_region = np.where(mask, self.image_magnitudes[i], 0)
-                            selected_phase = np.where(mask, self.image_phases[i], 0)
-                            selected_real = np.where(mask, self.image_real_part[i], 0)
-                            selected_imaginary = np.where(mask, self.image_imaginary_part[i], 0)
-
+                        if self.get_selected_mixer_region() == "Inner":
+                            selected_region = np.where(mask, self.get_image_magnitude(i), 0)
+                            selected_phase = np.where(mask, self.get_image_phase(i), 0)
+                            selected_real = np.where(mask, self.get_image_real(i), 0)
+                            selected_imaginary = np.where(mask, self.get_image_imaginary(i), 0)
                         else:
+                            selected_region = np.where(~mask, self.get_image_magnitude(i), 0)
+                            selected_phase = np.where(~mask, self.get_image_phase(i), 0)
+                            selected_real = np.where(~mask, self.get_image_real(i), 0)
+                            selected_imaginary = np.where(~mask, self.get_image_imaginary(i), 0)
 
-                            selected_region = np.where(~mask, self.image_magnitudes[i], 0)
-                            selected_phase = np.where(~mask, self.image_phases[i], 0)
-                            selected_real = np.where(~mask, self.image_real_part[i], 0)
-                            selected_imaginary = np.where(~mask, self.image_imaginary_part[i], 0)
-
-                        self.selected_magnitude[i]=selected_region
-                        self.selected_phase[i] = selected_phase
-                        self.selected_real[i]=selected_real
-                        self.selected_imaginary[i]=selected_imaginary
+                        self.set_selected_magnitude(i,selected_region)
+                        self.set_selected_phase(i,selected_phase)
+                        self.set_selected_real(i,selected_real)
+                        self.set_selected_imaginary(i,selected_imaginary)
                 self.update_output()
             finally:
                 self.is_updating_output = False
@@ -648,26 +597,19 @@ class UI(QMainWindow):
 
     def update_output(self):
 
-            if not isinstance(self.selected_magnitude[0],list):
-                mixed_magnitude = np.zeros_like(self.selected_magnitude[0])
-                mixed_phase = np.zeros_like(self.selected_phase[0],dtype='complex128')  # Allow complex numbers
-                mixed_real = np.zeros_like(self.selected_real[0])
-                mixed_imaginary = np.zeros_like(self.selected_imaginary[0])
-            elif not isinstance(self.selected_magnitude[1],list):
-                mixed_magnitude = np.zeros_like(self.selected_magnitude[1])
-                mixed_phase = np.zeros_like(self.selected_phase[1],dtype='complex128')  # Allow complex numbers
-                mixed_real = np.zeros_like(self.selected_real[1])
-                mixed_imaginary = np.zeros_like(self.selected_imaginary[1])
-            elif not isinstance(self.selected_magnitude[2],list):
-                mixed_magnitude = np.zeros_like(self.selected_magnitude[2])
-                mixed_phase = np.zeros_like(self.selected_phase[2],dtype='complex128')  # Allow complex numbers
-                mixed_real = np.zeros_like(self.selected_real[2])
-                mixed_imaginary = np.zeros_like(self.selected_imaginary[2])
-            else:
-                mixed_magnitude = np.zeros_like(self.selected_magnitude[3])
-                mixed_phase = np.zeros_like(self.selected_phase[3],dtype='complex128')  # Allow complex numbers
-                mixed_real = np.zeros_like(self.selected_real[3])
-                mixed_imaginary = np.zeros_like(self.selected_imaginary[3])
+            base_shape = None
+            for i in range(4):
+                if not isinstance(self.get_selected_magnitude(i), list):
+                    base_shape = self.get_selected_magnitude(i).shape
+                    break
+
+            if base_shape is None:
+                return
+
+            mixed_magnitude = np.zeros(base_shape)
+            mixed_phase = np.zeros(base_shape, dtype='complex128')
+            mixed_real = np.zeros(base_shape)
+            mixed_imaginary = np.zeros(base_shape)
 
             total_parts = 10
             self.progress_bar.setMinimum(0)
@@ -682,18 +624,18 @@ class UI(QMainWindow):
                 weight = self.sliders[i].value() / 100.0
 
                 if self.output_combo[i].currentText() == "Magnitude":
-                    if not isinstance(self.selected_magnitude[i],list):
-                        mixed_magnitude += weight * self.selected_magnitude[i]
+                    if not isinstance(self.get_selected_magnitude(i),list):
+                        mixed_magnitude += weight * self.get_selected_magnitude(i)
                         self.scroll_scale +=weight
                 elif self.output_combo[i].currentText() == "Phase":
-                    if not isinstance(self.selected_phase[i],list):
-                        mixed_phase += weight*np.exp(1j * (weight * self.selected_phase[i]))
+                    if not isinstance(self.get_selected_phase(i),list):
+                        mixed_phase += weight*np.exp(1j * (weight * self.get_selected_phase(i)))
                 elif self.output_combo[i].currentText() == "Real part":
-                    if not isinstance(self.selected_real[i],list):
-                        mixed_real += weight * self.selected_real[i]
+                    if not isinstance(self.get_selected_real(i),list):
+                        mixed_real += weight * self.get_selected_real(i)
                 else:
-                    if not isinstance(self.selected_imaginary[i],list):
-                        mixed_imaginary += weight * self.selected_imaginary[i]
+                    if not isinstance(self.get_selected_imaginary(i),list):
+                        mixed_imaginary += weight * self.get_selected_imaginary(i)
             mixed_phase = np.angle(mixed_phase)
             self.mixed_magnitude=np.copy(mixed_magnitude)
             self.mixed_phase=np.copy(mixed_phase)
@@ -706,11 +648,11 @@ class UI(QMainWindow):
                                                              self.output_label[0].size())
 
             # Set the output to the appropriate QLabel
-            if self.selected_port == "Port 1" and ("Magnitude" in self.combo or "Phase" in self.combo):
+            if self.get_selected_port() == "Port 1" and ("Magnitude" in self.combo or "Phase" in self.combo):
                 self.output_label[0].setPixmap(scaled_pixmap_mag_phase)
-            elif self.selected_port == "Port 1":
+            elif self.get_selected_port() == "Port 1":
                 self.output_label[0].setPixmap(scaled_pixmap_real_imag)
-            elif self.selected_port == "Port 2" and ("Magnitude" in self.combo or "Phase" in self.combo):
+            elif self.get_selected_port() == "Port 2" and ("Magnitude" in self.combo or "Phase" in self.combo):
                 self.output_label[1].setPixmap(scaled_pixmap_mag_phase)
             else:
                 self.output_label[1].setPixmap(scaled_pixmap_real_imag)
@@ -729,6 +671,75 @@ class UI(QMainWindow):
 
     def change_slider(self, index, value):
         self.update_output()
+
+    def get_selected_port(self):
+        return self.selected_port
+    def get_selected_mixer_region(self):
+        return self.selected_mixer_region
+    def get_image_magnitude(self, index):
+        return self.__image_magnitudes[index]
+
+    def set_image_magnitude(self, index, magnitude):
+        self.__image_magnitudes[index] = magnitude
+
+    def get_image_phase(self, index):
+        return self.__image_phases[index]
+
+    def set_image_phase(self, index, phase):
+        self.__image_phases[index] = phase
+
+    def get_image_real(self, index):
+        return self.__image_real_part[index]
+
+    def set_image_real(self, index, real):
+        self.__image_real_part[index] = real
+
+    def get_image_imaginary(self, index):
+        return self.__image_imaginary_part[index]
+
+    def set_image_imaginary(self, index, imaginary):
+        self.__image_imaginary_part[index] = imaginary
+
+    def get_selected_magnitude(self, index):
+        return self.__selected_magnitude[index]
+
+    def set_selected_magnitude(self, index, magnitude):
+        self.__selected_magnitude[index] = magnitude
+
+    def get_selected_phase(self, index):
+        return self.__selected_phase[index]
+
+    def set_selected_phase(self, index, phase):
+        self.__selected_phase[index] = phase
+
+    def get_selected_real(self, index):
+        return self.__selected_real[index]
+
+    def set_selected_real(self, index, real):
+        self.__selected_real[index] = real
+
+    def get_selected_imaginary(self, index):
+        return self.__selected_imaginary[index]
+
+    def set_selected_imaginary(self, index, imaginary):
+        self.__selected_imaginary[index] = imaginary
+
+    def get_mixed_magnitude(self):
+        return self.mixed_magnitude
+
+    def set_mixed_magnitude(self, magnitude):
+        self.mixed_magnitude = magnitude
+
+    def get_mixed_phase(self):
+        return self.mixed_phase
+
+    def set_mixed_phase(self, phase):
+        self.mixed_phase = phase
+    def get_f_shift(self,index):
+        return self.f_shift[index]
+    def set_f_shift(self, index,f_shift):
+        self.f_shift[index] = f_shift
+
 
 
 app = QtWidgets.QApplication([])
