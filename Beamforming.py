@@ -133,10 +133,30 @@ class PhasedArray:
                 raise ValueError("Unsupported axis. Use 'x' or 'y'.")
             phase_shifts = k * positions * np.cos(theta - self.steering_angle)
 
+        # elif self.geometry == 'curved':
+        #     angles = np.linspace(0, np.pi, self.num_elements) if self.semicircle else np.linspace(0, 2 * np.pi, self.num_elements)
+        #     positions = self.radius * np.sin(angles) + self.position_x
+        #     phase_shifts = k * positions * np.cos(theta - self.steering_angle)
         elif self.geometry == 'curved':
+            # Define angular positions of elements (semi-circle or full circle)
             angles = np.linspace(0, np.pi, self.num_elements) if self.semicircle else np.linspace(0, 2 * np.pi, self.num_elements)
-            positions = self.radius * np.sin(angles) + self.position_x
-            phase_shifts = k * positions * np.cos(theta - self.steering_angle)
+
+            # Compute the x and y positions of each element
+            x_positions = self.radius * np.cos(angles) + self.position_x
+            y_positions = self.radius * np.sin(angles) + self.position_y
+
+            # Calculate the phase shifts for each element
+            # Assuming far-field approximation and theta defines the observation direction
+            phase_shifts = k * (
+                x_positions * np.cos(theta - self.steering_angle) +
+                y_positions * np.sin(theta - self.steering_angle)
+            )
+            # phase_shifts = k * (
+            #         x_positions * np.cos(self.steering_angle) +
+            #         y_positions * np.sin(self.steering_angle)
+            #     )
+
+
 
         else:
             raise ValueError("Unsupported geometry. Use 'linear' or 'curved'.")
@@ -214,19 +234,17 @@ class BeamformingGUI(QMainWindow):
 
         # Wave Emission Control Buttons
         wave_control_layout = QHBoxLayout()
-        start_wave_button = QPushButton("Start Wave Emission")
-        start_wave_button.clicked.connect(self.start_wave_animation)
-        stop_wave_button = QPushButton("Stop Wave Emission")
-        stop_wave_button.clicked.connect(self.stop_wave_animation)
 
-        wave_control_layout.addWidget(start_wave_button)
-        wave_control_layout.addWidget(stop_wave_button)
-        self.control_panel.addLayout(wave_control_layout)
-
-        # Add phased array button
         add_array_button = QPushButton("Add Phased Array")
         add_array_button.clicked.connect(self.add_phased_array)
-        self.control_panel.addWidget(add_array_button)
+        clear_array_button = QPushButton("Clear All")
+        clear_array_button.clicked.connect(self.clear_phased_array)
+
+        wave_control_layout.addWidget(add_array_button)
+        wave_control_layout.addWidget(clear_array_button)
+        self.control_panel.addLayout(wave_control_layout)
+
+
 
         # Wave Emission Control Buttons
         simulation_layout = QHBoxLayout()
@@ -234,12 +252,19 @@ class BeamformingGUI(QMainWindow):
         first_button.clicked.connect(self.fifth_generation_simulation)
         second_button = QPushButton("Ultrasound simulation")
         second_button.clicked.connect(self.ultrasound_simulation)
-        third_button = QPushButton("Tumor ablation simulation")
+        fourth_button = QPushButton("Tumor ablation simulation")
+        fourth_button.clicked.connect(self.tumor_ablation_simulation2)
+        third_button = QPushButton("Tumor ablation simulation2")
         third_button.clicked.connect(self.tumor_ablation_simulation)
 
-        wave_control_layout.addWidget(first_button)
-        wave_control_layout.addWidget(second_button)
-        wave_control_layout.addWidget(third_button)
+
+
+        simulation_layout.addWidget(first_button)
+        simulation_layout.addWidget(second_button)
+        simulation_layout.addWidget(fourth_button)
+        simulation_layout.addWidget(third_button)
+
+
 
         self.control_panel.addLayout(simulation_layout)
 
@@ -349,7 +374,7 @@ class BeamformingGUI(QMainWindow):
         # Calculate diagonal length for rotation (expanded grid size)
         # diagonal_length = np.sqrt(2) * original_size
         # expanded_limit = diagonal_length / 2
-        grid_limit = max(50,1e6)
+        grid_limit = 1e7
         expanded_limit = np.sqrt(2) * grid_limit
 
         # Create an expanded 2D grid for interference calculation
@@ -397,7 +422,7 @@ class BeamformingGUI(QMainWindow):
                         )
                     ])
             elif phased_array.geometry == 'curved':
-                angles = np.linspace(0, np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
+                angles = np.linspace(0, -np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
                                                                                                                       2 * np.pi,
                                                                                                                       phased_array.num_elements)
                 element_positions = np.array([
@@ -471,7 +496,7 @@ class BeamformingGUI(QMainWindow):
                     )
                     element_x = np.full_like(element_y, phased_array.position_x)
             elif phased_array.geometry == 'curved':
-                angles = np.linspace(0, np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
+                angles = np.linspace(0, -np.pi, phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
                                                                                                                       2 * np.pi,
                                                                                                                       phased_array.num_elements)
                 element_x = phased_array.position_x + phased_array.radius * np.cos(angles)
@@ -482,118 +507,18 @@ class BeamformingGUI(QMainWindow):
 
         self.canvas_wave.draw()
 
-    # Remove start_wave_animation and stop_wave_animation methods
-    def start_wave_animation(self):
-        """Start the wave emission animation with a heat map of interference."""
-
-        def init():
-            ax = self.figure_wave.add_subplot(111)
-            ax.set_xlim([-50, 50])
-            ax.set_ylim([-50, 50])
-            ax.set_aspect(1)
-            ax.grid(alpha=0.2)
-            ax.set_title("Wave Interference Heat Map")
-
-            # Initialize an empty heat map
-            x = np.linspace(-50, 50, 200)
-            y = np.linspace(-50, 50, 200)
-            self.X, self.Y = np.meshgrid(x, y)
-            self.interference = np.zeros_like(self.X, dtype=float)
-
-            # Create the image for the heat map
-            self.im = ax.imshow(
-                self.interference,
-                extent=[-50, 50, -50, 50],
-                origin='lower',
-                cmap='coolwarm',
-                alpha=0.7
-            )
-            plt.colorbar(self.im, ax=ax, label='Interference Intensity')
-
-            return [self.im]
-
-        def update(frame_number):
-            # Create a new interference calculation for each frame
-            self.interference = np.zeros_like(self.X, dtype=float)
-
-            # Loop through active phased arrays
-            for phased_array in self.simulator.phased_arrays:
-                if not phased_array.enabled:
-                    continue
-
-                wavelength = phased_array.speed / phased_array.frequency
-
-                # Dynamically adjust phase based on time
-                dynamic_steering = phased_array.steering_angle + np.sin(frame_number * 0.1) * np.pi / 4
-
-                # Calculate element positions
-                if phased_array.geometry == 'linear':
-                    if phased_array.axis == 'x':
-                        element_positions = np.array([
-                            [x_pos, phased_array.position_y]
-                            for x_pos in np.linspace(
-                                phased_array.position_x - (phased_array.num_elements - 1) * phased_array.spacing / 2,
-                                phased_array.position_x + (phased_array.num_elements - 1) * phased_array.spacing / 2,
-                                phased_array.num_elements
-                            )
-                        ])
-                    else:
-                        element_positions = np.array([
-                            [phased_array.position_x, y_pos]
-                            for y_pos in np.linspace(
-                                phased_array.position_y - (phased_array.num_elements - 1) * phased_array.spacing / 2,
-                                phased_array.position_y + (phased_array.num_elements - 1) * phased_array.spacing / 2,
-                                phased_array.num_elements
-                            )
-                        ])
-                elif phased_array.geometry == 'curved':
-                    angles = np.linspace(0, -np.pi,
-                                         phased_array.num_elements) if phased_array.semicircle else np.linspace(0,
-                                                                                                                2 * np.pi,
-                                                                                                                phased_array.num_elements)
-                    element_positions = np.array([
-                        [phased_array.position_x + phased_array.radius * np.cos(angle),
-                         phased_array.position_y + phased_array.radius * np.sin(angle)]
-                        for angle in angles
-                    ])
-
-                # Calculate wave interference from each element
-                for element_pos in element_positions:
-                    # Calculate phase and distance with dynamic steering
-                    distance = np.sqrt((self.X - element_pos[0]) ** 2 + (self.Y - element_pos[1]) ** 2)
-                    phase = distance * (2 * np.pi / wavelength) + dynamic_steering
-                    self.interference += np.cos(phase)
-
-            # Normalize interference
-            range_value = self.interference.max() - self.interference.min()
-            if range_value > 0:
-                self.interference = (self.interference - self.interference.min()) / range_value
-
-            # Update the heat map
-            self.im.set_array(self.interference)
-            return [self.im]
-
-        # Check if animation is already running
-        if self.animation is None:
-            self.figure_wave.clear()  # Clear any previous plots
-            self.animation = FuncAnimation(self.figure_wave, update, init_func=init, interval=50, blit=True, frames=200)
-        self.canvas_wave.draw()
-
-    def stop_wave_animation(self):
-        """Stop the wave emission animation"""
-        if self.animation is not None:
-            self.animation.event_source.stop()
-            self.animation = None
-            # Reset the plot
-            self.figure_wave.clear()
-            self.setup_wave_plot()
-            self.canvas_wave.draw()
 
     def add_default_array(self):
         default_array = PhasedArray(name="Default Array")
         self.simulator.add_phased_array(default_array)
         self.array_selection_combobox.addItem(default_array.name)
         self.update_controls_for_selected_array()
+        self.update_plots()
+    # self.clear_phased_array
+    def clear_phased_array(self):
+        self.simulator.phased_arrays=[]
+        self.array_selection_combobox.clear()
+        self.add_default_array()
 
     def add_phased_array(self):
         array_name = f"Array {len(self.simulator.phased_arrays) + 1}"
@@ -627,13 +552,24 @@ class BeamformingGUI(QMainWindow):
         self.update_controls_for_selected_array()
         self.update_plots()
 
-    # name, num_elements=4, spacing_value=50,spacing=0.5,spacing_unit="Meters", axis='x', speed=3e8, frequency=1e9, geometry='linear', radius=1.0, steering_angle=0, semicircle=False,position_x=0, position_y=0
+
     def tumor_ablation_simulation(self):
         self.simulator.phased_arrays=[]
         self.array_selection_combobox.clear()
         array_name = "Tumor ablation array"
-        # spacing=(float(1540)/float(5e6))*0.06
-        phased_array = PhasedArray(name=array_name, num_elements=64,geometry='curved',axis='x', speed=1540, frequency=5e6,radius=0.10,semicircle=True)
+
+        phased_array = PhasedArray(name=array_name, num_elements=64,geometry='curved',axis='x', speed=1540, frequency=0.5e6,radius=0.07,semicircle=True)
+        phased_array.units=[1e3,1e6]
+        self.simulator.add_phased_array(phased_array)
+        self.array_selection_combobox.addItem(array_name)
+        self.update_controls_for_selected_array()
+        self.update_plots()
+    def tumor_ablation_simulation2(self):
+        self.simulator.phased_arrays=[]
+        self.array_selection_combobox.clear()
+        array_name = "Tumor ablation array"
+        spacing=(float(1540)/float(5e6))*0.49
+        phased_array = PhasedArray(name=array_name, num_elements=32, spacing_value=49,spacing=spacing,spacing_unit= "Wavelength (λ)",axis='x', speed=1540, frequency=5e6)
         phased_array.units=[1e3,1e6]
         self.simulator.add_phased_array(phased_array)
         self.array_selection_combobox.addItem(array_name)
@@ -698,7 +634,7 @@ class BeamformingGUI(QMainWindow):
         else:
             radius_label = QLabel(f"Radius (m): {phased_array.radius:.2f}")
             radius_slider = QSlider(Qt.Horizontal)
-            radius_slider.setRange(1, 50)
+            radius_slider.setRange(1, 100)
             radius_slider.setValue(int(phased_array.radius * 100))
             radius_slider.valueChanged.connect(
                 lambda value, pa=phased_array, lbl=radius_label: self.update_slider(pa, 'radius', value / 100, lbl, "Radius (m):"))
