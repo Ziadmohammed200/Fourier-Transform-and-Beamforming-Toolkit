@@ -339,9 +339,11 @@ class BeamformingGUI(QMainWindow):
             # write here the if conditional for the linear or curved arrays
             # Setup wave emitters similar to the first script's Demo 3
             # obj1= PhasedArray()
-            print(phased_array.units[0],phased_array.units[1])
+            # print(phased_array.units[0],phased_array.units[1])
+            logger.info(f"Phased Array '{phased_array.units[0],phased_array.units[1]}' units.")
             c, f = float(phased_array.speed)/float(phased_array.units[0]), float(phased_array.frequency) / float(phased_array.units[1])
-            print(c, f)
+            # print(c, f)
+            logger.info(f"Phased Array '{c, f}' speed and frequency.")
             # if c<f:
             #     c+=2*f
             #     print(c)
