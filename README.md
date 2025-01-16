@@ -25,13 +25,13 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 - **Easy Browsing**:
   - Replace any image by double-clicking its viewport to browse and load a new image.
 
-![Image Viewers]([docs/images/image_viewers.png "Image Viewers")](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/Image%20Mixer%201.png)
+![Image Viewers](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/Image%20Mixer%201.png)
 
 #### ⚖️ **2. Two Output Ports**
 - Display the mixer results in two dedicated output viewports.
 - Each viewport operates independently and mirrors the functionality of input viewports.
 
-![Output Ports][(docs/images/output_ports.png "Output Ports")](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/Image%20Mixer%202.png)
+![Output Ports](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/Image%20Mixer%202.png)
 
 #### 🔬 **3. Components Mixer**
 - Combine FT components from the four input images using weighted averages.
@@ -92,8 +92,8 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 - Load, visualize, and fine-tune scenarios via parameter settings files.
 
 ![Scenario Management](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc1.png)
-(https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc2.png)
-(https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc3.png)
+![Scenario Management2](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc2.png)
+![Scenario Management3](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc3.png)
 
 ---
 
@@ -158,9 +158,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgments
 - Tutorials and inspiration from [relevant links].
-- Contributions by [Team Name/Group].
 
-For any issues or contributions, please open an issue or submit a pull request on the [GitHub repository](https://github.com/your-username/ft-beamforming-toolkit).
 
 ## Contributors
 - [Ziad Mohamed](https://github.com/Ziadmohammed200) 
