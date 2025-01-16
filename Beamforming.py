@@ -341,20 +341,20 @@ class BeamformingGUI(QMainWindow):
             # obj1= PhasedArray()
             # print(phased_array.units[0],phased_array.units[1])
             logger.info(f"Phased Array '{phased_array.units[0],phased_array.units[1]}' units.")
-            c, f = float(phased_array.speed)/float(phased_array.units[0]), float(phased_array.frequency) / float(phased_array.units[1])
-            # print(c, f)
-            logger.info(f"Phased Array '{c, f}' speed and frequency.")
-            # if c<f:
-            #     c+=2*f
-            #     print(c)
-            lambda0 = c / f
+            speed, freq = float(phased_array.speed)/float(phased_array.units[0]), float(phased_array.frequency) / float(phased_array.units[1])
+            # print(speed, freq)
+            logger.info(f"Phased Array '{speed, freq}' speed and frequency.")
+            # if speed<freq:
+            #     speed+=2*freq
+            #     print(speed)
+            lambda0 = speed / freq
             N = phased_array.num_elements
 
             # xs = np.linspace(-lambda0, lambda0, N)
             xs = np.linspace(-1, 1, N)
             ys = np.zeros_like(xs)
             for i in range(N):
-                e = Emitter(xs[i], ys[i], c, f, 0)
+                e = Emitter(xs[i], ys[i], speed, freq, 0)
                 phase = CalculatePhaseFromFocus(0, 20, e)
                 e.SetPhase(phase)
                 self.emitter_array.AddEmitter(e)
@@ -444,7 +444,7 @@ class BeamformingGUI(QMainWindow):
                 # Add normalized phase contribution
                 interference += np.cos(2 * np.pi * normalized_phase)
                 r = np.sqrt((X - element_pos[0])**2 + (Y - element_pos[1])**2)
-                theta = np.arctan2(Y - element_pos[1], X - element_pos[0])
+                # theta = np.arctan2(Y - element_pos[1], X - element_pos[0])
                 phase_shift = k * r + phased_array.steering_angle
                 interference += np.cos(phase_shift)
 
