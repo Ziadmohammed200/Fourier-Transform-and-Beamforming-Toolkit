@@ -110,7 +110,7 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 - **`requirements.txt`**: List of dependencies.
 - **`main.py`**: Implementation of the FT Magnitude/Phase Mixer.
 - **`Beamforming.py`**: Implementation of the Beamforming Simulator.
-- **`ImageLabel.ui`**: UI for image label handling.
+- **`ImageLabel.py`**: UI for image label handling.
 
 ---
 
