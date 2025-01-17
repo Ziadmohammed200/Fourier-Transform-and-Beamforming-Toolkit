@@ -1,16 +1,15 @@
 # Fourier Transform and Beamforming Toolkit
 
-
-## Introduction
+## 🚀 Introduction
 This project includes two major components: a **Fourier Transform (FT) Magnitude/Phase Mixer** and a **Beamforming Simulator**. These tools provide an interactive platform to explore signal decomposition and beamforming techniques, tailored for real-time applications in fields such as communications, medical imaging, and signal processing.
 
 ---
 
-## Features
+## 🌟 Features
 
 ### Part A: FT Magnitude/Phase Mixer
 
-#### ✨ **1. Image Viewers**
+#### 🖼️ **1. Image Viewers**
 - **Grayscale Images**:
   - Open and view up to four grayscale images, each in its own viewport.
   - Automatically convert colored images to grayscale.
@@ -27,20 +26,21 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 
 ![Image Viewers](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/Image%20Mixer%201.png)
 
-#### ⚖️ **2. Two Output Ports**
+#### 🖥️ **2. Two Output Ports**
 - Display the mixer results in two dedicated output viewports.
 - Each viewport operates independently and mirrors the functionality of input viewports.
 
 ![Output Ports](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/Image%20Mixer%202.png)
 
-#### 🔬 **3. Components Mixer**
+#### 🔄 **3. Components Mixer**
 - Combine FT components from the four input images using weighted averages.
 - Customize weights for:
   - Magnitude and phase
   - Real and imaginary components
 
 ![Components Mixer](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/Image%20Mixer%203.png)
-#### 🌐 **4. Regions Mixer**
+
+#### 📐 **4. Regions Mixer**
 - Define a rectangular region on each FT component:
   - Inner region (low frequencies)
   - Outer region (high frequencies)
@@ -49,7 +49,7 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 
 ![Regions Mixer](docs/images/regions_mixer.png "Regions Mixer")
 
-#### ⏳ **5. Real-Time Mixing**
+#### ⏱️ **5. Real-Time Mixing**
 - Perform Inverse FFT (iFFT) to generate output images in real time.
 - Includes:
   - Progress bar to indicate operation status.
@@ -60,31 +60,32 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 
 ### Part B: Beamforming Simulator
 
-#### ⏫ **1. Real-Time Beam Steering**
+#### 🔄 **1. Real-Time Beam Steering**
 - Customize parameters to dynamically steer the beam direction:
   - Number of transmitters
   - Applied phase shifts
   - Operating frequency (real-time updates)
 
 ![Beam Steering](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%202.png)
-#### 🗺️ **2. Array Geometry**
+
+#### 🛠️ **2. Array Geometry**
 - Support for linear and curved array geometries:
   - Adjustable curvature parameters for curved arrays.
 
 ![Array Geometry](docs/images/array_geometry.png "Array Geometry")
 
-#### 💡 **3. Visualization**
+#### 📊 **3. Visualization**
 - Display constructive/destructive interference maps and beam profiles in synchronized viewers.
 
 ![Beamforming Maps](docs/images/beamforming_maps.png "Beamforming Maps")
 
-#### 🛠️ **4. Multi-Array Support**
+#### 🌐 **4. Multi-Array Support**
 - Add multiple phased array units to the system.
 - Customize location and parameters of each unit.
 
 ![Multi-Array Support](docs/images/multi_array_support.png "Multi-Array Support")
 
-#### 🔄 **5. Scenario Management**
+#### 📂 **5. Scenario Management**
 - Include at least three predefined scenarios inspired by:
   - 5G communications
   - Ultrasound imaging
@@ -92,28 +93,28 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 - Load, visualize, and fine-tune scenarios via parameter settings files.
 
 ![Scenario Management](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc1.png)
-![Scenario Management2](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc2.png)
-![Scenario Management3](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc3.png)
+![Scenario Management 2](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc2.png)
+![Scenario Management 3](https://github.com/marcilino-adel/Image-mixer-and-Beamforming/blob/56211bc0c856e82ac090ae61f2cfa64b88ce6e7a/Photos/2D%20Beamforming%20Simulator%20sc3.png)
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
 ### Directories
-- **src/**: Source code for both FT mixer and beamforming simulator.
-- **images/**: Sample images 
-- **Photos/**: Screen shoots.
+- **`src/`**: Source code for both FT mixer and beamforming simulator.
+- **`images/`**: Sample images.
+- **`Photos/`**: Screenshots.
 
 ### Files
-- **README.md**: Project overview and setup instructions.
-- **requirements.txt**: List of dependencies.
-- **main.py**: Implementation of the FT Magnitude/Phase Mixer.
-- **Beamforming.py**: Implementation of the Beamforming Simulator.
-- **ImageLabel.ui**: To handle image label.
+- **`README.md`**: Project overview and setup instructions.
+- **`requirements.txt`**: List of dependencies.
+- **`main.py`**: Implementation of the FT Magnitude/Phase Mixer.
+- **`Beamforming.py`**: Implementation of the Beamforming Simulator.
+- **`ImageLabel.ui`**: UI for image label handling.
 
 ---
 
-## Installation
+## 🛠️ Installation
 
 ### Prerequisites
 - Python 3.8+
@@ -122,7 +123,7 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 ### Steps
 1. **Clone the Repository**:
    ```bash
-   git clone (https://github.com/marcilino-adel/Image-mixer-and-Beamforming.git)
+   git clone https://github.com/marcilino-adel/Image-mixer-and-Beamforming.git
    cd ft-beamforming-toolkit
    ```
 
@@ -133,13 +134,13 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 
 3. **Run the Application**:
    ```bash
-   python main.py for image mixer
-   python Beanforming.py for Beamform
+   python main.py  # For image mixer
+   python Beamforming.py  # For beamforming
    ```
 
 ---
 
-## Usage
+## 📖 Usage
 
 ### FT Mixer
 - Open and manipulate grayscale images.
@@ -151,20 +152,20 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 
 ---
 
-## License
+## 📜 License
 This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-## Acknowledgments
+## 🙏 Acknowledgments
 - Tutorials and inspiration from [relevant links].
 
-
 ---
-## Contributors
-- [Ziad Mohamed](https://github.com/Ziadmohammed200) 
-- [Marcilino Adel](https://github.com/marcilino-adel)
-- [Ahmed Etman](https://github.com/AhmedEtma)
-- [Pavly Awad](https://github.com/PavlyAwad)
+
+## 🤝 Contributors
+- [Ziad Mohamed](https://github.com/Ziadmohammed200)  
+- [Marcilino Adel](https://github.com/marcilino-adel)  
+- [Ahmed Etman](https://github.com/AhmedEtma)  
+- [Pavly Awad](https://github.com/PavlyAwad)  
 - [Ahmed Rafat](https://github.com/AhmeedRaafatt)
 
