@@ -122,7 +122,7 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 ### Steps
 1. **Clone the Repository**:
    ```bash
-   git clone [https://github.com/your-username/ft-beamforming-toolkit.git](https://github.com/marcilino-adel/Image-mixer-and-Beamforming.git)
+   git clone (https://github.com/marcilino-adel/Image-mixer-and-Beamforming.git)
    cd ft-beamforming-toolkit
    ```
 
@@ -160,6 +160,7 @@ This project is licensed under the [MIT License](LICENSE).
 - Tutorials and inspiration from [relevant links].
 
 
+---
 ## Contributors
 - [Ziad Mohamed](https://github.com/Ziadmohammed200) 
 - [Marcilino Adel](https://github.com/marcilino-adel)
