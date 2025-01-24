@@ -55,7 +55,10 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
 - Includes:
   - Progress bar to indicate operation status.
 
-![Real-Time Mixing](docs/images/real_time_mixing.png "Real-Time Mixing")
+
+https://github.com/user-attachments/assets/53be83ee-a247-46fa-a0f2-e9d1f73bf886
+
+
 
 ---
 
