@@ -46,8 +46,9 @@ This project includes two major components: a **Fourier Transform (FT) Magnitude
   - Outer region (high frequencies)
 - Options to include either region in the output.
 - Unified region size across all four images, adjustable via resize handles.
+![Screenshot 2025-01-24 172212](https://github.com/user-attachments/assets/8774287a-e4fa-4c81-bd98-e20095888cb0)
 
-![Regions Mixer](docs/images/regions_mixer.png "Regions Mixer")
+![Screenshot 2025-01-24 172236](https://github.com/user-attachments/assets/111df469-0d04-4bc2-8af9-83333fe690c4)
 
 #### ⏱️ **5. Real-Time Mixing**
 - Perform Inverse FFT (iFFT) to generate output images in real time.
